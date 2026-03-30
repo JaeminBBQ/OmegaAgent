@@ -159,16 +159,22 @@ def play_audio(audio_bytes: bytes) -> None:
 
 def play_chime(chime_type: str = "wake") -> None:
     """Play a short chime to indicate state change."""
-    # Generate a simple tone programmatically
+    try:
+        # Use the output device's native sample rate
+        dev_info = sd.query_devices(sd.default.device[1], "output")
+        out_sr = int(dev_info["default_samplerate"])
+    except Exception:
+        out_sr = 48000
+
     duration = 0.15 if chime_type == "wake" else 0.1
     freq = 880 if chime_type == "wake" else 440
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), dtype=np.float32)
+    t = np.linspace(0, duration, int(out_sr * duration), dtype=np.float32)
     tone = 0.3 * np.sin(2 * np.pi * freq * t)
     # Fade in/out to avoid clicks
-    fade = int(SAMPLE_RATE * 0.01)
+    fade = int(out_sr * 0.01)
     tone[:fade] *= np.linspace(0, 1, fade)
     tone[-fade:] *= np.linspace(1, 0, fade)
-    sd.play(tone, SAMPLE_RATE)
+    sd.play(tone, out_sr)
     sd.wait()
 
 
