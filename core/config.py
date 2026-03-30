@@ -25,8 +25,16 @@ ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 # --- Serper ---
 SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
 
-# --- Desktop GPU Server (STT/TTS) ---
-GPU_SERVER_URL: str = os.getenv("GPU_SERVER_URL", "http://desktop:5000")
+# --- Desktop GPU Server (STT/TTS at 172.16.0.94) ---
+WHISPER_URL: str = os.getenv("WHISPER_URL", "http://172.16.0.94:8000")
+FISH_TTS_URL: str = os.getenv("FISH_TTS_URL", "http://172.16.0.94:8080")
+KOKORO_TTS_URL: str = os.getenv("KOKORO_TTS_URL", "http://172.16.0.94:8081")
+
+# --- Obsidian Vault ---
+OBSIDIAN_VAULT_PATH: str = os.getenv("OBSIDIAN_VAULT_PATH", "./vault")
+
+# --- Discord (notifications) ---
+DISCORD_WEBHOOK_URL: str = os.getenv("DISCORD_WEBHOOK_URL", "")
 
 # --- General ---
 DEFAULT_TIMEZONE: str = os.getenv("DEFAULT_TIMEZONE", "America/Los_Angeles")

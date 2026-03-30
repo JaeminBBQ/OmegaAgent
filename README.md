@@ -46,8 +46,8 @@ Self-hosted modular AI platform running on a home network. The PN64 runs all bac
 RPi clients hit `/status` on the PN64 first (2s timeout). If the PN64 is down, they can fall back to the desktop running the same FastAPI image. The active host is cached for 30 seconds.
 
 ```python
-PRIMARY = "http://pn64:8080"
-FALLBACK = "http://desktop:8080"
+PRIMARY = "http://172.16.0.200:8080"    # PN64
+FALLBACK = "http://172.16.0.94:8080"   # Desktop
 
 async def get_active_host():
     try:
@@ -85,8 +85,8 @@ uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
 Test it:
 ```bash
-curl http://localhost:8080/status
-curl -X POST http://localhost:8080/agents/weather/run
+curl http://172.16.0.200:8080/status
+curl -X POST http://172.16.0.200:8080/agents/weather/run
 ```
 
 ---
@@ -130,13 +130,16 @@ docker compose up -d --build
 
 The desktop only runs GPU-accelerated model services. It does NOT run the FastAPI backend or agents in normal operation.
 
-### Services
-| Service | Port | Model | VRAM |
+### Services (`172.16.0.94`)
+| Service | Port | Model | Purpose |
 |---|---|---|---|
-| Whisper STT | `:5000` | Large v3 Turbo | ~3 GB |
-| Fish Speech TTS | `:5001` | S1-mini (custom voice) | ~2 GB |
+| Whisper STT | `:8000` | Large v3 Turbo | Speech-to-text transcription |
+| Fish Speech TTS | `:8080` | S1-mini | High-quality TTS with voice cloning (~2-3s) |
+| Kokoro TTS | `:8081` | 82M | Fast lightweight TTS (~instant) |
 
-The PN64 proxies STT/TTS requests to the desktop via `GPU_SERVER_URL` in `.env`.
+Health checks: `GET http://172.16.0.94:{port}/v1/health`
+
+The PN64 proxies STT/TTS requests to the desktop via `WHISPER_URL`, `FISH_TTS_URL`, `KOKORO_TTS_URL` in `.env`. See `API_REFERENCE.md` for full endpoint documentation.
 
 > Desktop can also run the full OmegaAgent stack as a fallback if the PN64 goes down. Just clone the repo, configure `.env`, and `docker compose up -d --build`.
 
@@ -173,7 +176,9 @@ The RPi 400 is a keyboard-only work assistant tied to the Obsidian vault. No scr
 | **Anthropic** | `ANTHROPIC_API_KEY` | `core/llm.py` | All agents (Haiku summaries, analysis) |
 | **Supabase** | `SUPABASE_URL`, `SUPABASE_KEY` | `core/db.py` | Persisting agent results, future RAG storage |
 | **Serper** | `SERPER_API_KEY` | `core/search.py` | Agents needing web search (jobs, salary, reno intel) |
-| **GPU Server** | `GPU_SERVER_URL` | `core/config.py` | STT/TTS via desktop GPU (Whisper + Fish Speech) |
+| **Whisper STT** | `WHISPER_URL` | `core/speech.py` | Speech-to-text via desktop GPU |
+| **Fish TTS** | `FISH_TTS_URL` | `core/speech.py` | High-quality TTS via desktop GPU |
+| **Kokoro TTS** | `KOKORO_TTS_URL` | `core/speech.py` | Fast TTS via desktop GPU |
 
 ### What works without keys
 
@@ -182,7 +187,7 @@ The RPi 400 is a keyboard-only work assistant tied to the Obsidian vault. No scr
 | Anthropic | Agents fall back to simple text summaries (no LLM analysis) |
 | Supabase | Agent results not persisted (returned in API response only) |
 | Serper | Search-dependent agents won't function |
-| GPU Server | STT/TTS unavailable (agents + text API still work fine) |
+| GPU Services | STT/TTS unavailable (agents + text API still work fine) |
 
 ---
 
@@ -202,6 +207,7 @@ OmegaAgent/
 │   ├── db.py                  # Supabase client
 │   ├── search.py              # Serper web search
 │   ├── scraper.py             # Playwright browser scraping
+│   ├── speech.py              # Whisper STT + Fish/Kokoro TTS wrapper
 │   └── embeddings.py          # Embedding client (provider TBD)
 │
 ├── agents/                    # Each agent is its own package

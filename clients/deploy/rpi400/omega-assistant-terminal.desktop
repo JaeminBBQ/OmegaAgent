@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OmegaAgent Assistant
+Comment=OmegaAgent RPi 400 keyboard assistant
+Exec=bash -c "sleep 5 && lxterminal --title='OmegaAgent' -e '/home/jaeminbbq/Projects/OmegaAgent/clients/deploy/rpi400/start_omega.sh'"
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5

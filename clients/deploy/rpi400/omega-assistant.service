@@ -1,0 +1,17 @@
+[Unit]
+Description=OmegaAgent RPi 400 Assistant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jaeminbbq
+WorkingDirectory=/home/jaeminbbq/Projects/OmegaAgent/clients
+ExecStart=/usr/bin/python3 /home/jaeminbbq/Projects/OmegaAgent/clients/rpi400_assistant.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -62,10 +62,10 @@ docker ps
 # Should show: omega-agent container running
 
 # 5. Test the API
-curl http://localhost:8080/status
+curl http://172.16.0.200:8080/status
 # Should return JSON with status: "ok" or "degraded"
 
-curl -X POST http://localhost:8080/agents/weather/run | jq
+curl -X POST http://172.16.0.200:8080/agents/weather/run | jq
 # Should return weather data for Reno, NV with Haiku summary
 ```
 
@@ -84,73 +84,74 @@ docker compose up -d --build
 
 ---
 
-## Phase 2: Deploy Desktop GPU Services
+## Phase 2: Verify Desktop GPU Services
 
-The Desktop will run Whisper STT and Fish Speech TTS. For now, let's set up a minimal test server to verify the PN64 can reach it.
+The Desktop (`172.16.0.94`) runs 3 GPU-accelerated services. These should already be running.
 
-SSH into your Desktop:
+### Health checks
 
+From the PN64 (or any machine on the LAN):
 ```bash
-# 1. Create a test GPU service directory
-mkdir -p ~/gpu-services
-cd ~/gpu-services
-
-# 2. Create a simple test server
-cat > test_server.py << 'EOF'
-from fastapi import FastAPI
-import uvicorn
-
-app = FastAPI()
-
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "desktop-gpu-test"}
-
-@app.post("/stt")
-async def stt_placeholder(audio: bytes = None):
-    return {"transcription": "Test STT response - Whisper not installed yet"}
-
-@app.post("/tts")
-async def tts_placeholder(text: str = ""):
-    return {"audio_url": "test.wav", "message": "Test TTS response - Fish Speech not installed yet"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
-EOF
-
-# 3. Install FastAPI
-python3 -m pip install fastapi uvicorn
-
-# 4. Run the test server
-python3 test_server.py
+curl http://172.16.0.94:8000/v1/health   # Whisper STT
+curl http://172.16.0.94:8080/v1/health   # Fish Speech TTS
+curl http://172.16.0.94:8081/v1/health   # Kokoro TTS
+# All should return: {"status": "ok"}
 ```
 
-From the PN64, test connectivity:
+### Test STT (Whisper)
 ```bash
-curl http://desktop:5000/health
-# Should return: {"status":"ok","service":"desktop-gpu-test"}
+# Record a short clip (or use any .wav file)
+curl http://172.16.0.94:8000/v1/audio/transcriptions \
+  -F "file=@test_audio.wav"
+# Returns: {"text": "Your transcribed text here."}
 ```
 
-> **Later**: You'll replace this test server with actual Whisper + Fish Speech containers. For now, this proves the network path works.
+### Test TTS (Kokoro — fast)
+```bash
+curl -X POST http://172.16.0.94:8081/v1/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from OmegaAgent.", "voice": "af_heart"}' \
+  --output test_kokoro.wav
+# Should produce a playable WAV file
+```
+
+### Test TTS (Fish Speech — quality)
+```bash
+curl -X POST http://172.16.0.94:8080/v1/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from OmegaAgent."}' \
+  --output test_fish.wav
+```
+
+See `API_REFERENCE.md` for full endpoint documentation.
 
 ---
 
 ## Phase 3: Test PN64 ↔ Desktop Communication
 
-On the PN64, verify the GPU_SERVER_URL is reachable:
+From the PN64 host, verify the OmegaAgent container can reach the desktop GPU services:
 
 ```bash
-# From inside the omega-agent container
-docker exec omega-agent curl http://desktop:5000/health
+# From the PN64 host directly
+curl http://172.16.0.94:8000/v1/health
+curl http://172.16.0.94:8080/v1/health
+curl http://172.16.0.94:8081/v1/health
 
-# Or test from PN64 host
-curl http://desktop:5000/health
+# From inside the omega-agent container
+docker exec omega-agent curl http://172.16.0.94:8000/v1/health
+docker exec omega-agent curl http://172.16.0.94:8080/v1/health
+docker exec omega-agent curl http://172.16.0.94:8081/v1/health
+```
+
+The `/status` endpoint also reports GPU service health:
+```bash
+curl http://172.16.0.200:8080/status | jq '.services[] | select(.name | startswith("whisper") or startswith("fish") or startswith("kokoro"))'
 ```
 
 If this fails, check:
-1. Desktop firewall allows port 5000
-2. Both machines are on the same LAN
-3. Hostname resolution works (try IP instead: `http://192.168.1.x:5000`)
+1. Desktop firewall allows ports 8000, 8080, 8081
+2. Both machines are on the same VLAN/subnet
+3. GPU services are running on the desktop (`docker ps` on desktop)
 
 ---
 
@@ -179,8 +180,8 @@ Tests failover: PN64 primary, Desktop fallback.
 import asyncio
 import httpx
 
-PRIMARY = "http://pn64:8080"
-FALLBACK = "http://desktop:8080"
+PRIMARY = "http://172.16.0.200:8080"    # PN64
+FALLBACK = "http://172.16.0.94:8080"   # Desktop (fallback)
 
 async def get_active_host():
     """Discover which server is up."""
