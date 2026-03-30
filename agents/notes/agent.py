@@ -10,9 +10,9 @@ Manages: work notes, work logs, todos, reminders, meeting notes,
 import logging
 from datetime import datetime
 
+from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import InMemorySaver
 
 from core.config import ANTHROPIC_API_KEY, OBSIDIAN_VAULT_PATH
 from agents.notes.tools import ALL_TOOLS
@@ -88,11 +88,11 @@ class NoteAgent:
             api_key=ANTHROPIC_API_KEY,
             temperature=0.0,
         )
-        self._checkpointer = MemorySaver()
-        self._agent = create_react_agent(
+        self._checkpointer = InMemorySaver()
+        self._agent = create_agent(
             model=self._model,
             tools=ALL_TOOLS,
-            prompt=_build_system_prompt(),
+            system_prompt=_build_system_prompt(),
             checkpointer=self._checkpointer,
         )
         self._thread_id = f"session-{datetime.now().strftime('%Y%m%d')}"
@@ -100,11 +100,11 @@ class NoteAgent:
 
     def reset(self) -> None:
         """Reset conversation memory and start a fresh session."""
-        self._checkpointer = MemorySaver()
-        self._agent = create_react_agent(
+        self._checkpointer = InMemorySaver()
+        self._agent = create_agent(
             model=self._model,
             tools=ALL_TOOLS,
-            prompt=_build_system_prompt(),
+            system_prompt=_build_system_prompt(),
             checkpointer=self._checkpointer,
         )
         self._thread_id = f"session-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
