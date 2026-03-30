@@ -45,6 +45,9 @@ HELP_TEXT = """
 ║    /worklog <msg> — add work log entry    ║
 ║    /capture <msg> — quick daily note      ║
 ║                                           ║
+║  Research:                                ║
+║    /research <q>  — web search + summarize║
+║                                           ║
 ║  Other:                                   ║
 ║    /weather       — get Reno weather      ║
 ║    /status        — check server health   ║
@@ -265,6 +268,21 @@ async def handle_quick_capture(text: str) -> None:
         print(f"❌ {e}")
 
 
+async def handle_research(query: str) -> None:
+    """Search the web and summarize findings."""
+    print("\n🔍 Searching...")
+    try:
+        reply = await client.research_chat(query)
+        print(f"\n🔎 {reply}")
+        await send_to_discord(f"**Research:** {query}\n\n🔎 {reply}", username="🔎 Research")
+
+        if tts_enabled:
+            audio = await client.speak(reply)
+            play_audio(audio)
+    except Exception as e:
+        print(f"❌ Research failed: {e}")
+
+
 async def handle_chat(message: str) -> None:
     """Send message to Haiku and display/speak the reply."""
     print("\n⏳ Thinking...")
@@ -322,6 +340,9 @@ async def main() -> None:
             print(f"💬 Discord is now {state}")
         elif user_input == "/help":
             await handle_help()
+        elif user_input.startswith("/research "):
+            query = user_input[10:].strip()
+            await handle_research(query)
         elif user_input.startswith("/note "):
             msg = user_input[6:].strip()
             await handle_note(msg)

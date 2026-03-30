@@ -197,6 +197,20 @@ class OmegaClient:
             r.raise_for_status()
             return r.json()["result"]
 
+    # -- Research -----------------------------------------------------------
+
+    async def research_chat(self, message: str, thread_id: str | None = None) -> str:
+        """Ask the research agent to search the web and summarize."""
+        host = await self._get_host()
+        payload: dict = {"message": message}
+        if thread_id:
+            payload["thread_id"] = thread_id
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post(f"{host}/research/chat", json=payload)
+            r.raise_for_status()
+            return r.json()["reply"]
+
     # -- Full pipelines -----------------------------------------------------
 
     async def voice_ask(self, audio_bytes: bytes) -> tuple[str, bytes]:
