@@ -338,9 +338,17 @@ async def voice_loop() -> None:
     """Main always-listening voice loop with wake word detection."""
     try:
         from openwakeword.model import Model as WakeWordModel
+        import openwakeword
     except ImportError:
         logger.error("openwakeword not installed. Run: pip install openwakeword")
         return
+
+    # Auto-download models if missing
+    try:
+        logger.info("Ensuring wake word models are downloaded...")
+        openwakeword.utils.download_models()
+    except Exception as e:
+        logger.warning("Model download check: %s", e)
 
     # Initialize wake word model
     logger.info("Loading wake word model: %s (threshold: %.2f)",
