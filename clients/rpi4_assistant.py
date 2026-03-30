@@ -132,21 +132,40 @@ def audio_to_wav_bytes(audio_data: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-def play_audio(audio_bytes: bytes) -> None:
-    """Play audio through speaker."""
+def _get_output_samplerate() -> int:
+    """Get the output device's native sample rate."""
     try:
+        dev_info = sd.query_devices(sd.default.device[1], "output")
+        return int(dev_info["default_samplerate"])
+    except Exception:
+        return 48000
+
+
+def play_audio(audio_bytes: bytes) -> None:
+    """Play audio through speaker, resampling to device native rate if needed."""
+    try:
+        from scipy.signal import resample
+
         buf = io.BytesIO(audio_bytes)
         data, samplerate = sf.read(buf)
-        sd.play(data, samplerate)
+        out_sr = _get_output_samplerate()
+
+        # Resample if device doesn't support the audio's native rate
+        if samplerate != out_sr:
+            num_samples = int(len(data) * out_sr / samplerate)
+            data = resample(data, num_samples)
+
+        sd.play(data.astype(np.float32), out_sr)
         sd.wait()
-    except Exception:
-        # Fallback to aplay
+    except Exception as e:
+        logger.warning("sounddevice playback failed: %s, trying aplay", e)
+        # Fallback to aplay (handles sample rate conversion internally)
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(audio_bytes)
             tmp = f.name
         try:
             subprocess.run(
-                ["aplay", tmp],
+                ["aplay", "-D", "plughw:3,0", tmp],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=30,

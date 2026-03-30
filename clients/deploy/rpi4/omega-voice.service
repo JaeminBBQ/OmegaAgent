@@ -1,0 +1,16 @@
+[Unit]
+Description=OmegaAgent RPi 4 Voice Assistant
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jaeminbbq
+WorkingDirectory=/home/jaeminbbq/Projects/OmegaAgent/clients
+EnvironmentFile=/home/jaeminbbq/Projects/OmegaAgent/clients/.env
+ExecStart=/home/jaeminbbq/Projects/OmegaAgent/clients/.venv/bin/python3 rpi4_assistant.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
