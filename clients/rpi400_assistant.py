@@ -146,11 +146,13 @@ async def handle_status() -> None:
             r = await http.get(f"{host}/status")
             data = r.json()
 
-        print(f"\n🖥  Server: {host}")
-        print(f"📊 Status: {data['status']}")
+        msg = f"🖥 **Server:** {host}\n📊 **Status:** {data['status']}\n"
         for svc in data.get("services", []):
             icon = "✅" if svc["status"] == "ok" else "❌"
-            print(f"   {icon} {svc['name']}: {svc['status']} ({svc['latency_ms']}ms)")
+            msg += f"   {icon} {svc['name']}: {svc['status']} ({svc['latency_ms']}ms)\n"
+
+        print(f"\n{msg}")
+        await send_to_discord(msg, username="📊 Status")
     except Exception as e:
         print(f"❌ Status check failed: {e}")
 
