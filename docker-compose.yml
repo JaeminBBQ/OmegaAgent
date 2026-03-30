@@ -9,3 +9,5 @@ services:
       - .env
     volumes:
       - ${VAULT_HOST_PATH:-./vault}:/app/vault
+    environment:
+      - OBSIDIAN_VAULT_PATH=/app/vault
