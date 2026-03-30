@@ -40,6 +40,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Audio Device Auto-Detection ---------------------------------------------
+
+def _find_device(name_substring: str = "EMEET") -> int | None:
+    """Find audio device index by name substring."""
+    devices = sd.query_devices()
+    for i, dev in enumerate(devices):
+        if name_substring.lower() in dev["name"].lower():
+            return i
+    return None
+
+
+def _setup_audio_device() -> None:
+    """Auto-detect EMEET conference mic/speaker and set as default."""
+    device_name = os.getenv("AUDIO_DEVICE", "EMEET")
+    idx = _find_device(device_name)
+    if idx is not None:
+        sd.default.device = (idx, idx)
+        dev = sd.query_devices(idx)
+        logger.info("Audio device: %s (index %d)", dev["name"], idx)
+    else:
+        logger.warning("'%s' not found, using system default", device_name)
+
+
+_setup_audio_device()
+
 # --- Configuration -----------------------------------------------------------
 
 SAMPLE_RATE = 16000
