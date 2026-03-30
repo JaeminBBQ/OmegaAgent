@@ -1,7 +1,8 @@
 # Shared (both RPis)
 httpx>=0.27.0
 
-# RPi 4 only (voice dashboard)
+# RPi 4 only (voice assistant)
 sounddevice>=0.4.6
 soundfile>=0.12.1
 numpy>=1.26.0
+openwakeword>=0.6.0
