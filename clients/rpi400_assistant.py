@@ -50,6 +50,7 @@ HELP_TEXT = """
 ║    /status        — check server health   ║
 ║    /voice         — toggle TTS on/off     ║
 ║    /discord       — toggle Discord on/off ║
+║    /help          — send commands to Discord║
 ║    /quit          — exit                  ║
 ║                                           ║
 ║  Or just type a question for Haiku        ║
@@ -103,6 +104,32 @@ def play_audio(audio_bytes: bytes) -> None:
             logger.warning("No audio player found (tried aplay, ffplay)")
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
+async def handle_help() -> None:
+    """Send the full command list to Discord."""
+    commands = """**📋 OmegaAgent — RPi 400 Commands**
+
+**Notes:**
+`/note <msg>` — talk to note agent
+`/task <desc>` — add a task
+`/tasks` — list pending tasks
+`/remind <msg> <time>` — set reminder
+`/reminders` — list reminders
+`/worklog <msg>` — add work log entry
+`/capture <msg>` — quick daily note
+
+**Other:**
+`/weather` — get Reno weather
+`/status` — check server health
+`/voice` — toggle TTS on/off
+`/discord` — toggle Discord on/off
+`/help` — send this to Discord
+`/quit` — exit
+
+Or just type a question for Haiku."""
+    print(commands)
+    await send_to_discord(commands, username="📋 Commands")
 
 
 async def handle_weather() -> None:
@@ -293,6 +320,8 @@ async def main() -> None:
             discord_enabled = not discord_enabled
             state = "ON" if discord_enabled else "OFF"
             print(f"💬 Discord is now {state}")
+        elif user_input == "/help":
+            await handle_help()
         elif user_input.startswith("/note "):
             msg = user_input[6:].strip()
             await handle_note(msg)
