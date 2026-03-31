@@ -95,11 +95,14 @@ class OmegaClient:
     async def speak(
         self, text: str, provider: str = "kokoro", voice: str = "af_heart"
     ) -> bytes:
-        """Generate TTS audio from text. Returns WAV bytes."""
+        """Generate TTS audio from text. Returns WAV bytes.
+
+        Timeout is 90s to accommodate Fish Speech voice cloning latency.
+        """
         host = await self._get_host()
         payload = {"text": text, "provider": provider, "voice": voice}
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             r = await client.post(f"{host}/speech/tts", json=payload)
             r.raise_for_status()
             return r.content
