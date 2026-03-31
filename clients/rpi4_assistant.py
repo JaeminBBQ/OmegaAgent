@@ -83,9 +83,8 @@ SILENCE_THRESHOLD = 500  # RMS below this = silence
 SILENCE_DURATION = 1.5  # Seconds of silence before auto-stop
 SPEECH_START_TIMEOUT = 3.0  # Seconds to wait for speech after wake word
 
-# TTS voice settings
+# TTS voice settings (use "fish:name" for cloned voices, otherwise Kokoro built-in)
 TTS_VOICE = os.getenv("TTS_VOICE", "af_heart")
-TTS_PROVIDER = os.getenv("TTS_PROVIDER", "kokoro")
 
 # Discord webhook (optional)
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
@@ -528,7 +527,6 @@ async def voice_loop() -> None:
                                 speech_text = clean_for_speech(response)
                                 audio_reply = await client.speak(
                                     speech_text,
-                                    provider=TTS_PROVIDER,
                                     voice=TTS_VOICE,
                                 )
                                 play_audio(audio_reply)
