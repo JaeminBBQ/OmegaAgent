@@ -66,6 +66,7 @@ class SpeechClient:
         voice: str = "af_heart",
         format: str = "wav",
         reference_audio: bytes | None = None,
+        reference_text: str | None = None,
     ) -> bytes:
         """Generate speech audio from text.
 
@@ -75,6 +76,7 @@ class SpeechClient:
             voice: Voice ID (Kokoro only).
             format: Output format (wav, mp3).
             reference_audio: Raw audio bytes for Fish Speech voice cloning.
+            reference_text: Transcript of the reference audio (improves clone quality).
 
         Returns:
             Raw audio bytes.
@@ -89,13 +91,16 @@ class SpeechClient:
         else:
             url = f"{self._fish_url}/v1/tts"
             if reference_audio:
-                # Voice cloning: send reference audio as multipart
-                logger.debug("TTS request (fish clone): %d chars, %d ref bytes",
-                             len(text), len(reference_audio))
+                # Voice cloning: send reference audio + transcript as multipart
+                form_data = {"text": text, "format": format}
+                if reference_text:
+                    form_data["reference_text"] = reference_text
+                logger.debug("TTS request (fish clone): %d chars, %d ref bytes, ref_text=%s",
+                             len(text), len(reference_audio), bool(reference_text))
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     resp = await client.post(
                         url,
-                        data={"text": text, "format": format},
+                        data=form_data,
                         files={"reference_audio": ("reference.wav", reference_audio, "audio/wav")},
                     )
                     resp.raise_for_status()

@@ -79,6 +79,7 @@ async def text_to_speech(request: TTSRequest):
     reference_audio = None
 
     # Detect fish:voice_name → use Fish Speech with cloned voice
+    reference_text = None
     if voice.startswith("fish:"):
         provider = TTSProvider.FISH
         voice_name = voice[5:]  # strip "fish:" prefix
@@ -91,6 +92,11 @@ async def text_to_speech(request: TTSRequest):
                 break
         if reference_audio is None:
             raise HTTPException(status_code=404, detail=f"Voice reference not found: {voice_name}")
+        # Load reference text transcript if available
+        ref_txt_path = VOICE_DIR / f"{voice_name}.txt"
+        if ref_txt_path.exists():
+            reference_text = ref_txt_path.read_text().strip()
+            logger.info("Reference text loaded: %d chars", len(reference_text))
     else:
         provider = TTSProvider.KOKORO if request.provider == "kokoro" else TTSProvider.FISH
 
@@ -101,6 +107,7 @@ async def text_to_speech(request: TTSRequest):
             voice=voice,
             format=request.format,
             reference_audio=reference_audio,
+            reference_text=reference_text,
         )
         media_type = "audio/wav" if request.format == "wav" else "audio/mpeg"
         return Response(content=audio_bytes, media_type=media_type)
@@ -205,9 +212,11 @@ async def voice_manager_page():
             <input type="text" name="voice_name" placeholder="e.g. my_voice" required>
             <label>Reference Audio (10-30s of clear speech, WAV or MP3):</label>
             <input type="file" name="file" accept=".wav,.mp3" required>
+            <label>Reference Transcript (type exactly what is said in the audio):</label>
+            <input type="text" name="reference_text" placeholder="e.g. Hello, my name is Jaemin and I'm testing my voice." required>
             <button type="submit">Upload Voice</button>
         </form>
-        <p class="note">Upload a short audio clip of the voice you want to clone. Fish Speech will use it as a reference for voice synthesis.</p>
+        <p class="note">The transcript must match what's spoken in the audio clip. This is critical for accurate pitch and tone cloning.</p>
     </body>
     </html>
     """
@@ -216,11 +225,13 @@ async def voice_manager_page():
 @router.post("/voices/upload")
 async def upload_voice_reference(
     voice_name: str = "",
+    reference_text: str = "",
     file: UploadFile = File(...),
 ):
     """Upload a reference audio file for Fish Speech voice cloning.
 
     The audio should be 10-30 seconds of clear speech.
+    reference_text should be the exact transcript of what's said in the audio.
     """
     import re
 
@@ -240,7 +251,14 @@ async def upload_voice_reference(
 
     out_path = VOICE_DIR / f"{voice_name}{ext}"
     out_path.write_bytes(audio_bytes)
-    logger.info("Voice reference saved: %s (%d bytes)", out_path.name, len(audio_bytes))
+
+    # Save reference text alongside audio
+    if reference_text.strip():
+        txt_path = VOICE_DIR / f"{voice_name}.txt"
+        txt_path.write_text(reference_text.strip())
+
+    logger.info("Voice reference saved: %s (%d bytes, ref_text=%d chars)",
+                out_path.name, len(audio_bytes), len(reference_text))
 
     return HTMLResponse(
         f'<html><body style="font-family:sans-serif;background:#0d1117;color:#c9d1d9;padding:40px">'
