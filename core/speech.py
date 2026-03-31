@@ -65,6 +65,7 @@ class SpeechClient:
         provider: TTSProvider = TTSProvider.KOKORO,
         voice: str = "af_heart",
         format: str = "wav",
+        reference_audio: bytes | None = None,
     ) -> bytes:
         """Generate speech audio from text.
 
@@ -73,6 +74,7 @@ class SpeechClient:
             provider: KOKORO (fast, default) or FISH (high quality).
             voice: Voice ID (Kokoro only).
             format: Output format (wav, mp3).
+            reference_audio: Raw audio bytes for Fish Speech voice cloning.
 
         Returns:
             Raw audio bytes.
@@ -80,14 +82,29 @@ class SpeechClient:
         if provider == TTSProvider.KOKORO:
             url = f"{self._kokoro_url}/v1/tts"
             payload = {"text": text, "voice": voice}
+            logger.debug("TTS request (kokoro): %d chars to %s", len(text), url)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
         else:
             url = f"{self._fish_url}/v1/tts"
-            payload = {"text": text, "format": format}
-
-        logger.debug("TTS request (%s): %d chars to %s", provider, len(text), url)
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
+            if reference_audio:
+                # Voice cloning: send reference audio as multipart
+                logger.debug("TTS request (fish clone): %d chars, %d ref bytes",
+                             len(text), len(reference_audio))
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.post(
+                        url,
+                        data={"text": text, "format": format},
+                        files={"reference_audio": ("reference.wav", reference_audio, "audio/wav")},
+                    )
+                    resp.raise_for_status()
+            else:
+                payload = {"text": text, "format": format}
+                logger.debug("TTS request (fish): %d chars to %s", len(text), url)
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(url, json=payload)
+                    resp.raise_for_status()
 
         logger.info("TTS result (%s): %d bytes audio", provider, len(resp.content))
         return resp.content

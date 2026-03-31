@@ -66,19 +66,41 @@ async def transcribe_audio(file: UploadFile = File(...)):
 async def text_to_speech(request: TTSRequest):
     """Generate speech audio from text via desktop GPU TTS.
 
+    Voice IDs:
+        - Kokoro built-in: af_heart, am_adam, etc.
+        - Fish clone: fish:my_voice (loads reference audio from /voices/)
+
     Returns raw audio bytes (WAV by default).
     """
     from core.speech import TTSProvider
     from main import speech
 
-    provider = TTSProvider.KOKORO if request.provider == "kokoro" else TTSProvider.FISH
+    voice = request.voice
+    reference_audio = None
+
+    # Detect fish:voice_name → use Fish Speech with cloned voice
+    if voice.startswith("fish:"):
+        provider = TTSProvider.FISH
+        voice_name = voice[5:]  # strip "fish:" prefix
+        # Look for reference audio file
+        for ext in (".wav", ".mp3"):
+            ref_path = VOICE_DIR / f"{voice_name}{ext}"
+            if ref_path.exists():
+                reference_audio = ref_path.read_bytes()
+                logger.info("Using cloned voice: %s (%d bytes ref)", voice_name, len(reference_audio))
+                break
+        if reference_audio is None:
+            raise HTTPException(status_code=404, detail=f"Voice reference not found: {voice_name}")
+    else:
+        provider = TTSProvider.KOKORO if request.provider == "kokoro" else TTSProvider.FISH
 
     try:
         audio_bytes = await speech.speak(
             text=request.text,
             provider=provider,
-            voice=request.voice,
+            voice=voice,
             format=request.format,
+            reference_audio=reference_audio,
         )
         media_type = "audio/wav" if request.format == "wav" else "audio/mpeg"
         return Response(content=audio_bytes, media_type=media_type)
