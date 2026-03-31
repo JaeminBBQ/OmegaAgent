@@ -25,6 +25,12 @@ def register_health_check(name: str, check_fn) -> None:
     _health_checks.append((name, check_fn))
 
 
+@router.get("/ping")
+async def ping():
+    """Lightweight liveness check — no service health checks, instant response."""
+    return {"status": "ok", "uptime_seconds": round(time.time() - _start_time, 2)}
+
+
 @router.get("/status", response_model=StatusResponse)
 async def get_status() -> StatusResponse:
     """

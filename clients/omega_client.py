@@ -31,9 +31,9 @@ async def get_active_host() -> str:
 
     for host in [PRIMARY, FALLBACK]:
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.get(f"{host}/status")
-                if r.status_code == 200 and r.json().get("status") in ["ok", "degraded"]:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(f"{host}/ping")
+                if r.status_code == 200 and r.json().get("status") == "ok":
                     _active_host = host
                     _host_checked_at = time.time()
                     logger.info("Active host: %s", host)

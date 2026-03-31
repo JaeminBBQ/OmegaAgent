@@ -83,6 +83,10 @@ SILENCE_THRESHOLD = 500  # RMS below this = silence
 SILENCE_DURATION = 1.5  # Seconds of silence before auto-stop
 SPEECH_START_TIMEOUT = 3.0  # Seconds to wait for speech after wake word
 
+# TTS voice settings
+TTS_VOICE = os.getenv("TTS_VOICE", "af_heart")
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "kokoro")
+
 # Discord webhook (optional)
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
@@ -195,6 +199,64 @@ def play_chime(chime_type: str = "wake") -> None:
     tone[-fade:] *= np.linspace(1, 0, fade)
     sd.play(tone, out_sr)
     sd.wait()
+
+
+# --- Text Cleaning for TTS ---------------------------------------------------
+
+def clean_for_speech(text: str) -> str:
+    """Strip emojis, markdown, URLs, and other non-speakable characters.
+
+    Keeps the text natural for TTS output through a speaker.
+    """
+    import re as _re
+
+    # Remove URLs
+    text = _re.sub(r"https?://\S+", "", text)
+
+    # Remove markdown headers (## Header → Header)
+    text = _re.sub(r"^#{1,6}\s*", "", text, flags=_re.MULTILINE)
+
+    # Remove markdown bold/italic (***bold italic***, **bold**, *italic*)
+    text = _re.sub(r"\*{1,3}([^*]+)\*{1,3}", r"\1", text)
+    text = _re.sub(r"_{1,3}([^_]+)_{1,3}", r"\1", text)
+
+    # Remove markdown bullet points (- item, * item)
+    text = _re.sub(r"^[\-\*]\s+", "", text, flags=_re.MULTILINE)
+
+    # Remove markdown links [text](url) → text
+    text = _re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+
+    # Remove inline code backticks
+    text = _re.sub(r"`([^`]+)`", r"\1", text)
+
+    # Remove emojis (unicode emoji ranges)
+    emoji_pattern = _re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map
+        "\U0001F1E0-\U0001F1FF"  # flags
+        "\U00002702-\U000027B0"  # dingbats
+        "\U000024C2-\U0001F251"  # enclosed chars
+        "\U0001F900-\U0001F9FF"  # supplemental symbols
+        "\U0001FA00-\U0001FA6F"  # chess symbols
+        "\U0001FA70-\U0001FAFF"  # symbols extended
+        "\U00002600-\U000026FF"  # misc symbols
+        "\U0000FE00-\U0000FE0F"  # variation selectors
+        "\U0000200D"             # zero width joiner
+        "]+",
+        flags=_re.UNICODE,
+    )
+    text = emoji_pattern.sub("", text)
+
+    # Remove horizontal rules (--- or ***)
+    text = _re.sub(r"^[\-\*]{3,}\s*$", "", text, flags=_re.MULTILINE)
+
+    # Collapse multiple newlines/spaces
+    text = _re.sub(r"\n{3,}", "\n\n", text)
+    text = _re.sub(r"  +", " ", text)
+
+    return text.strip()
 
 
 # --- Discord -----------------------------------------------------------------
@@ -460,10 +522,15 @@ async def voice_loop() -> None:
                                 username="🎙 RPi 4",
                             )
 
-                            # Speak response
+                            # Speak response (cleaned for TTS)
                             state.set(AssistantState.SPEAKING)
                             try:
-                                audio_reply = await client.speak(response)
+                                speech_text = clean_for_speech(response)
+                                audio_reply = await client.speak(
+                                    speech_text,
+                                    provider=TTS_PROVIDER,
+                                    voice=TTS_VOICE,
+                                )
                                 play_audio(audio_reply)
                             except Exception as e:
                                 logger.warning("TTS failed: %s", e)

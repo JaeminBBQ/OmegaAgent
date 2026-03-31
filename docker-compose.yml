@@ -9,6 +9,7 @@ services:
       - .env
     volumes:
       - ${VAULT_HOST_PATH:-./vault}:/app/vault
+      - ./voices:/app/voices
     environment:
       - OBSIDIAN_VAULT_PATH=/app/vault
       - TZ=America/Los_Angeles
