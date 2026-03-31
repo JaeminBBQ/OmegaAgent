@@ -2,12 +2,15 @@
 
 Proxies requests to the desktop GPU server at 172.16.0.94.
 All three services expose OpenAI-compatible endpoints.
+
+Fish Speech S1 Mini uses msgpack-serialized requests with
+ServeReferenceAudio schema for voice cloning.
 """
 
 import logging
 from enum import Enum
-
 import httpx
+import ormsgpack
 
 from core.config import FISH_TTS_URL, KOKORO_TTS_URL, WHISPER_URL
 
@@ -90,26 +93,42 @@ class SpeechClient:
                 resp.raise_for_status()
         else:
             url = f"{self._fish_url}/v1/tts"
+
+            # Build Fish Speech S1 Mini request (msgpack format)
+            references = []
             if reference_audio:
-                # Voice cloning: send reference audio + transcript as multipart
-                form_data = {"text": text, "format": format}
-                if reference_text:
-                    form_data["reference_text"] = reference_text
-                logger.debug("TTS request (fish clone): %d chars, %d ref bytes, ref_text=%s",
-                             len(text), len(reference_audio), bool(reference_text))
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.post(
-                        url,
-                        data=form_data,
-                        files={"reference_audio": ("reference.wav", reference_audio, "audio/wav")},
-                    )
-                    resp.raise_for_status()
+                references.append({
+                    "audio": reference_audio,
+                    "text": reference_text or "",
+                })
+                logger.debug("TTS request (fish clone): %d chars, %d ref bytes, ref_text=%d chars",
+                             len(text), len(reference_audio), len(reference_text or ""))
             else:
-                payload = {"text": text, "format": format}
                 logger.debug("TTS request (fish): %d chars to %s", len(text), url)
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(url, json=payload)
-                    resp.raise_for_status()
+
+            request_data = {
+                "text": text,
+                "references": references,
+                "reference_id": None,
+                "format": format,
+                "max_new_tokens": 1024,
+                "chunk_length": 300,
+                "top_p": 0.8,
+                "repetition_penalty": 1.1,
+                "temperature": 0.8,
+                "streaming": False,
+                "use_memory_cache": "off",
+                "seed": None,
+            }
+
+            body = ormsgpack.packb(request_data)
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    url,
+                    content=body,
+                    headers={"content-type": "application/msgpack"},
+                )
+                resp.raise_for_status()
 
         logger.info("TTS result (%s): %d bytes audio", provider, len(resp.content))
         return resp.content
