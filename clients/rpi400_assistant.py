@@ -16,7 +16,10 @@ import tempfile
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
 from omega_client import OmegaClient
+
+load_dotenv(Path(__file__).parent / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
