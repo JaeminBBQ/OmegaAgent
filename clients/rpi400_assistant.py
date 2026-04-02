@@ -60,7 +60,7 @@ HELP_TEXT = """
 ╚════════════════════════════════════════════╝
 """
 
-tts_enabled = True
+tts_enabled = False
 discord_enabled = True
 
 
