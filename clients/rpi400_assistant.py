@@ -71,7 +71,7 @@ async def send_to_discord(content: str, username: str = "RPi 400") -> None:
     # Discord has a 2000 char limit per message
     chunks = [content[i:i + 1990] for i in range(0, len(content), 1990)]
     try:
-        async with httpx.AsyncClient(timeout=5.0) as http:
+        async with httpx.AsyncClient(timeout=10.0) as http:
             for chunk in chunks:
                 resp = await http.post(
                     DISCORD_WEBHOOK_URL,
