@@ -1,0 +1,3 @@
+# RPi 400 (keyboard assistant — lightweight)
+httpx
+python-dotenv

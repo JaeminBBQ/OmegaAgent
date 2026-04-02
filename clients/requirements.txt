@@ -1,9 +1,5 @@
-# Shared (both RPis)
+# Use the device-specific requirements file:
+#   RPi 400:  pip install -r requirements-rpi400.txt
+#   RPi 4:    pip install -r requirements-rpi4.txt
 httpx
-python-dotenv>=0.27.0
-
-# RPi 4 only (voice assistant)
-sounddevice>=0.4.6
-soundfile>=0.12.1
-numpy>=1.26.0
-openwakeword>=0.6.0
+python-dotenv
