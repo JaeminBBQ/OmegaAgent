@@ -13,3 +13,5 @@ langchain-core>=0.3.0
 langchain-anthropic>=1.0.0
 langgraph>=1.0.0
 ormsgpack>=1.4.0
+ebooklib>=0.18
+beautifulsoup4>=4.12.0

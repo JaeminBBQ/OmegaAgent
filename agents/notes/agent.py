@@ -20,9 +20,15 @@ from agents.notes.tools import ALL_TOOLS
 logger = logging.getLogger(__name__)
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(context_summary: str = "") -> str:
     """Build system prompt with current date/time (called fresh each request)."""
     now = datetime.now()
+    summary_block = ""
+    if context_summary:
+        summary_block = f"""\n\nCONVERSATION CONTEXT (summarized from earlier messages):
+{context_summary}
+
+Use the above context to maintain continuity. The user may reference things from earlier."""
     return f"""You are OmegaAgent's note assistant. You help the user organize their
 thoughts, tasks, work logs, and knowledge using an Obsidian vault at: {OBSIDIAN_VAULT_PATH}
 
@@ -73,11 +79,13 @@ WORKFLOW FOR PLANNING:
 - Break large tasks into subtasks using task_add
 
 Be concise but helpful. Speak naturally. If the user seems to be using voice,
-keep responses short and conversational."""
+keep responses short and conversational.{summary_block}"""
 
 
 class NoteAgent:
     """LangChain ReAct agent with Obsidian vault tools."""
+
+    MAX_TURNS = 20  # Auto-summarize after this many user messages
 
     def __init__(self) -> None:
         if not ANTHROPIC_API_KEY:
@@ -88,27 +96,70 @@ class NoteAgent:
             api_key=ANTHROPIC_API_KEY,
             temperature=0.0,
         )
-        self._checkpointer = InMemorySaver()
-        self._agent = create_agent(
-            model=self._model,
-            tools=ALL_TOOLS,
-            system_prompt=_build_system_prompt(),
-            checkpointer=self._checkpointer,
-        )
-        self._thread_id = f"session-{datetime.now().strftime('%Y%m%d')}"
+        self._context_summary = ""
+        self._turn_count = 0
+        self._init_agent()
         logger.info("NoteAgent initialized (thread: %s)", self._thread_id)
 
-    def reset(self) -> None:
-        """Reset conversation memory and start a fresh session."""
+    def _init_agent(self) -> None:
+        """Create a fresh agent with current context summary."""
         self._checkpointer = InMemorySaver()
         self._agent = create_agent(
             model=self._model,
             tools=ALL_TOOLS,
-            system_prompt=_build_system_prompt(),
+            system_prompt=_build_system_prompt(self._context_summary),
             checkpointer=self._checkpointer,
         )
         self._thread_id = f"session-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    def reset(self) -> None:
+        """Reset conversation memory and start a fresh session."""
+        self._context_summary = ""
+        self._turn_count = 0
+        self._init_agent()
         logger.info("NoteAgent reset (thread: %s)", self._thread_id)
+
+    async def _summarize_and_trim(self, messages: list) -> None:
+        """Summarize the conversation so far, then reset with the summary."""
+        # Extract human/AI message pairs for summarization
+        conversation_text = []
+        for msg in messages:
+            role = getattr(msg, "type", "unknown")
+            content = getattr(msg, "content", "")
+            if role in ("human", "ai") and content:
+                prefix = "User" if role == "human" else "Assistant"
+                conversation_text.append(f"{prefix}: {content[:500]}")
+
+        if not conversation_text:
+            return
+
+        summary_prompt = (
+            "Summarize this conversation in 3-5 concise bullet points. "
+            "Focus on: what the user asked for, what actions were taken, "
+            "any ongoing context the user might reference later.\n\n"
+            + "\n".join(conversation_text[-30:])  # Last 30 messages max
+        )
+
+        try:
+            summary_result = await self._model.ainvoke(
+                [{"role": "user", "content": summary_prompt}]
+            )
+            new_summary = summary_result.content
+            # Append to existing summary if there is one
+            if self._context_summary:
+                self._context_summary = (
+                    f"Previous context:\n{self._context_summary}\n\n"
+                    f"Recent context:\n{new_summary}"
+                )
+            else:
+                self._context_summary = new_summary
+            logger.info("Context summarized (%d chars), resetting session",
+                        len(self._context_summary))
+        except Exception as e:
+            logger.warning("Context summarization failed: %s", e)
+
+        self._turn_count = 0
+        self._init_agent()
 
     async def chat(self, user_message: str, thread_id: str | None = None) -> str:
         """Send a message to the agent and return the response text.
@@ -129,4 +180,9 @@ class NoteAgent:
             {"messages": [{"role": "user", "content": stamped_message}]},
             config=config,
         )
+
+        self._turn_count += 1
+        if self._turn_count >= self.MAX_TURNS:
+            await self._summarize_and_trim(result["messages"])
+
         return result["messages"][-1].content

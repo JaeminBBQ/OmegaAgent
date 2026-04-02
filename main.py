@@ -14,6 +14,7 @@ from api.models import ServiceHealth
 from api.routes.agents import router as agents_router
 from api.routes.chat import router as chat_router
 from api.routes.notes import router as notes_router
+from api.routes.reading import router as reading_router
 from api.routes.research import router as research_router
 from api.routes.speech import router as speech_router
 from api.routes.status import register_health_check, router as status_router
@@ -138,14 +139,17 @@ app.include_router(agents_router)
 app.include_router(chat_router)
 app.include_router(speech_router)
 app.include_router(notes_router)
+app.include_router(reading_router)
 app.include_router(research_router)
 
 
 # --- LangChain agents (need their own instances) ----------------------------
 from agents.notes import NoteAgent
+from agents.reading import ReadingAgent
 from agents.research import ResearchAgent
 
 note_agent = NoteAgent()
+reading_agent = ReadingAgent()
 research_agent = ResearchAgent()
 
 

@@ -10,6 +10,8 @@ services:
     volumes:
       - ${VAULT_HOST_PATH:-./vault}:/app/vault
       - ./voices:/app/voices
+      - ./books:/app/books
     environment:
       - OBSIDIAN_VAULT_PATH=/app/vault
+      - BOOKS_DIR=/app/books
       - TZ=America/Los_Angeles
