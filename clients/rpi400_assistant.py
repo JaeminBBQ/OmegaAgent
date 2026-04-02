@@ -27,10 +27,7 @@ logger = logging.getLogger(__name__)
 client = OmegaClient()
 
 # --- Discord webhook (mirrors all responses to Discord) -------------------
-DISCORD_WEBHOOK_URL = os.getenv(
-    "DISCORD_WEBHOOK_URL",
-    "https://discord.com/api/webhooks/1487995591182258237/4lSljasHrm9EKsSpVDUR0JISbdn8R4iYZ3n1ZE4nwbYH_wUPiUNPXBdg6vK9WY1_RUjm",
-)
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
 HELP_TEXT = """
 ╔════════════════════════════════════════════╗
@@ -73,12 +70,14 @@ async def send_to_discord(content: str, username: str = "RPi 400") -> None:
     try:
         async with httpx.AsyncClient(timeout=5.0) as http:
             for chunk in chunks:
-                await http.post(
+                resp = await http.post(
                     DISCORD_WEBHOOK_URL,
                     json={"content": chunk, "username": username},
                 )
+                if resp.status_code >= 400:
+                    logger.warning("Discord webhook HTTP %d: %s", resp.status_code, resp.text[:200])
     except Exception as e:
-        logger.warning("Discord webhook failed: %s", e)
+        logger.warning("Discord webhook failed: %s (%s)", e, type(e).__name__)
 
 
 def play_audio(audio_bytes: bytes) -> None:
