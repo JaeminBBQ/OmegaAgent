@@ -147,6 +147,35 @@
         .speed-control { display: flex; align-items: center; gap: 8px; }
         .speed-control span { color: #8b949e; font-size: 0.85em; min-width: 40px; }
 
+        /* --- Mic / Voice Command --- */
+        .mic-btn {
+            width: 48px; height: 48px; border-radius: 50%; border: 2px solid #30363d;
+            background: #21262d; color: #c9d1d9; font-size: 1.2em;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .mic-btn:active { background: #30363d; }
+        .mic-btn.recording { background: #da3633; border-color: #da3633; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+        .voice-overlay {
+            position: fixed; inset: 0; background: #0d1117ee;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 150; padding: 24px;
+        }
+        .voice-overlay.hidden { display: none; }
+        .voice-overlay .status { color: #58a6ff; font-size: 1.3em; margin-bottom: 16px; }
+        .voice-overlay .transcript { color: #8b949e; font-size: 0.95em; margin-bottom: 12px; max-width: 500px; text-align: center; }
+        .voice-overlay .response {
+            color: #e6edf3; font-size: 1em; line-height: 1.6; max-width: 500px;
+            max-height: 50vh; overflow-y: auto; text-align: left;
+            background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+            padding: 16px; white-space: pre-wrap; width: 100%;
+        }
+        .voice-overlay button {
+            margin-top: 16px; padding: 12px 32px; background: #21262d; color: #c9d1d9;
+            border: 1px solid #30363d; border-radius: 8px; font-size: 1em; cursor: pointer;
+        }
+
         /* --- Loading overlay --- */
         .loading-overlay {
             position: fixed; inset: 0; background: #0d1117ee;
@@ -176,6 +205,7 @@
     <div class="top-bar">
         <h1>OmegaReader</h1>
         <div class="spacer"></div>
+        <button class="mic-btn" id="micBtn" onclick="toggleVoiceCommand()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
     </div>
     <div class="book-grid" id="bookGrid">
         <div class="empty-state">Loading books...</div>
@@ -206,7 +236,7 @@
         </div>
         <div class="spacer"></div>
         <span class="subtitle" id="readerProgress"></span>
-        <button onclick="toggleVoicePicker()" id="btnVoice" style="font-size:0.8em">🎤</button>
+        <button onclick="toggleVoicePicker()" id="btnVoice" style="font-size:0.8em">Voice</button>
     </div>
     <div class="reader-progress"><div class="reader-progress-fill" id="progressFill" style="width:0%"></div></div>
 
@@ -231,6 +261,14 @@
 
 <!-- Voice picker overlay -->
 <div class="voice-picker" id="voicePicker"></div>
+
+<!-- Voice command overlay -->
+<div class="voice-overlay hidden" id="voiceOverlay">
+    <div class="status" id="voiceStatus">Tap to start recording</div>
+    <div class="transcript" id="voiceTranscript"></div>
+    <div class="response hidden" id="voiceResponse"></div>
+    <button onclick="closeVoiceOverlay()">Close</button>
+</div>
 
 <!-- ==================== SUMMARY SCREEN ==================== -->
 <div class="screen" id="screenSummary">
@@ -701,6 +739,104 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowRight' || e.key === 'l') nextPage();
     if (e.key === 'ArrowLeft' || e.key === 'h') prevPage();
 });
+
+// ---------------------------------------------------------------------------
+// Voice Command (mic → STT → note agent)
+// ---------------------------------------------------------------------------
+let voiceRecording = false;
+let mediaRecorder = null;
+let audioChunks = [];
+
+async function toggleVoiceCommand() {
+    const overlay = document.getElementById('voiceOverlay');
+    const micBtn = document.getElementById('micBtn');
+
+    if (!voiceRecording) {
+        // Start recording
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                await processVoiceCommand();
+            };
+
+            mediaRecorder.start();
+            voiceRecording = true;
+            micBtn.classList.add('recording');
+            overlay.classList.remove('hidden');
+            document.getElementById('voiceStatus').textContent = 'Recording... tap mic to stop';
+            document.getElementById('voiceTranscript').textContent = '';
+            document.getElementById('voiceResponse').textContent = '';
+            document.getElementById('voiceResponse').classList.add('hidden');
+        } catch (e) {
+            toast('Mic access denied');
+        }
+    } else {
+        // Stop recording
+        voiceRecording = false;
+        micBtn.classList.remove('recording');
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    }
+}
+
+async function processVoiceCommand() {
+    const statusEl = document.getElementById('voiceStatus');
+    const transcriptEl = document.getElementById('voiceTranscript');
+    const responseEl = document.getElementById('voiceResponse');
+
+    statusEl.textContent = 'Transcribing...';
+
+    try {
+        // Send audio to STT
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const form = new FormData();
+        form.append('file', blob, 'voice.webm');
+        const sttResp = await fetch(`${OMEGA}/speech/transcribe`, { method: 'POST', body: form });
+        if (!sttResp.ok) throw new Error('Transcription failed');
+        const sttData = await sttResp.json();
+        const transcript = sttData.text || sttData.transcript || '';
+
+        if (!transcript.trim()) {
+            statusEl.textContent = 'No speech detected';
+            return;
+        }
+
+        transcriptEl.textContent = 'You said: ' + transcript;
+        statusEl.textContent = 'Processing...';
+
+        // Send to note agent
+        const noteResp = await fetch(`${OMEGA}/notes/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: transcript }),
+        });
+        if (!noteResp.ok) throw new Error('Note agent failed');
+        const noteData = await noteResp.json();
+        const reply = noteData.response || noteData.reply || JSON.stringify(noteData);
+
+        statusEl.textContent = 'Done';
+        responseEl.textContent = reply;
+        responseEl.classList.remove('hidden');
+
+    } catch (e) {
+        statusEl.textContent = 'Error: ' + e.message;
+    }
+}
+
+function closeVoiceOverlay() {
+    document.getElementById('voiceOverlay').classList.add('hidden');
+    if (voiceRecording) {
+        voiceRecording = false;
+        document.getElementById('micBtn').classList.remove('recording');
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Upload
