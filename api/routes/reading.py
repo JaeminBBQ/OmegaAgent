@@ -1,5 +1,6 @@
 """Reading assistant API routes — EPUB upload, chapters, TTS, progress, summaries."""
 
+import asyncio
 import logging
 import shutil
 from pathlib import Path
@@ -55,7 +56,8 @@ async def upload_book(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        metadata = ingest_epub_file(tmp_path)
+        loop = asyncio.get_event_loop()
+        metadata = await loop.run_in_executor(None, ingest_epub_file, tmp_path)
     except Exception as e:
         logger.error("EPUB ingestion failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to process EPUB: {e}")
