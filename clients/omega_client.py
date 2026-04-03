@@ -210,7 +210,7 @@ class OmegaClient:
             payload["thread_id"] = thread_id
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.post(f"{host}/research/chat", json=payload)
+            r = await client.post(f"{host}/websearch/chat", json=payload)
             r.raise_for_status()
             return r.json()["reply"]
 

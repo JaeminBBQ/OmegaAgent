@@ -1,6 +1,6 @@
-"""Research Agent — web search and summarization with LangChain.
+"""WebSearch Agent — web search and summarization with LangChain.
 
-Default model: Claude Haiku (fast web research)
+Default model: Claude Haiku (fast web search)
 Escalation:    Claude Sonnet via ask_sonnet in note agent (if needed)
 
 Capabilities: web search, news search, page fetching, save to vault.
@@ -14,7 +14,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import InMemorySaver
 
 from core.config import ANTHROPIC_API_KEY
-from agents.research.tools import ALL_TOOLS
+from agents.websearch.tools import ALL_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _build_system_prompt() -> str:
     """Build system prompt with current date/time."""
     now = datetime.now()
-    return f"""You are OmegaAgent's research assistant. You help the user find information
+    return f"""You are OmegaAgent's web search assistant. You help the user find information
 on the web, summarize findings, and optionally save research to their Obsidian vault.
 
 CURRENT DATE AND TIME: {now.strftime('%Y-%m-%d %H:%M:%S')} ({now.strftime('%A')})
@@ -47,8 +47,8 @@ GUIDELINES:
 - Be direct. Don't pad responses with filler."""
 
 
-class ResearchAgent:
-    """LangChain agent with web research tools."""
+class WebSearchAgent:
+    """LangChain agent with web search tools."""
 
     def __init__(self) -> None:
         if not ANTHROPIC_API_KEY:
@@ -66,8 +66,8 @@ class ResearchAgent:
             system_prompt=_build_system_prompt(),
             checkpointer=self._checkpointer,
         )
-        self._thread_id = f"research-{datetime.now().strftime('%Y%m%d')}"
-        logger.info("ResearchAgent initialized (thread: %s)", self._thread_id)
+        self._thread_id = f"websearch-{datetime.now().strftime('%Y%m%d')}"
+        logger.info("WebSearchAgent initialized (thread: %s)", self._thread_id)
 
     def reset(self) -> None:
         """Reset conversation memory."""
@@ -78,11 +78,11 @@ class ResearchAgent:
             system_prompt=_build_system_prompt(),
             checkpointer=self._checkpointer,
         )
-        self._thread_id = f"research-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        logger.info("ResearchAgent reset (thread: %s)", self._thread_id)
+        self._thread_id = f"websearch-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        logger.info("WebSearchAgent reset (thread: %s)", self._thread_id)
 
     async def chat(self, user_message: str, thread_id: str | None = None) -> str:
-        """Send a message to the research agent and return the response.
+        """Send a message to the websearch agent and return the response.
 
         Args:
             user_message: The user's research question.

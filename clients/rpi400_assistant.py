@@ -45,8 +45,8 @@ HELP_TEXT = """
 ║    /worklog <msg> — add work log entry    ║
 ║    /capture <msg> — quick daily note      ║
 ║                                           ║
-║  Research:                                ║
-║    /research <q>  — web search + summarize║
+║  WebSearch:                               ║
+║    /websearch <q> — web search + summarize║
 ║                                           ║
 ║  Other:                                   ║
 ║    /weather       — get Reno weather      ║
@@ -342,8 +342,8 @@ async def main() -> None:
             print(f"💬 Discord is now {state}")
         elif user_input == "/help":
             await handle_help()
-        elif user_input.startswith("/research "):
-            query = user_input[10:].strip()
+        elif user_input.startswith("/websearch "):
+            query = user_input[11:].strip()
             await handle_research(query)
         elif user_input.startswith("/note "):
             msg = user_input[6:].strip()
