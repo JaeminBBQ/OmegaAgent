@@ -19,6 +19,27 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
+# Auto-detect EMEET USB audio and set as ALSA default
+EMEET_CARD=$(arecord -l 2>/dev/null | grep -i "emeet" | head -1 | sed -n 's/^card \([0-9]*\).*/\1/p')
+if [ -n "$EMEET_CARD" ]; then
+    echo "[reader] EMEET mic found on card $EMEET_CARD — setting as default"
+    export ALSA_CARD="$EMEET_CARD"
+    # Write .asoundrc so Chromium uses this device
+    cat > "$HOME/.asoundrc" << ASOUND
+pcm.!default {
+    type hw
+    card $EMEET_CARD
+}
+ctl.!default {
+    type hw
+    card $EMEET_CARD
+}
+ASOUND
+else
+    echo "[reader] WARNING: EMEET mic not found. 'arecord -l' shows:"
+    arecord -l 2>/dev/null || true
+fi
+
 # Chromium flags (no keyring, kiosk, autoplay audio, touch)
 CHROMIUM_FLAGS=(
     --kiosk
