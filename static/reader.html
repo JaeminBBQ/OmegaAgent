@@ -182,6 +182,14 @@
         }
         .stop-btn:active { background: #b62324; }
 
+        .stt-toggle {
+            padding: 4px 10px; border-radius: 12px; border: 1px solid #30363d;
+            background: #21262d; color: #8b949e; font-size: 0.75em; cursor: pointer;
+            margin-right: 6px;
+        }
+        .stt-toggle:active { background: #30363d; }
+        .stt-toggle .mode { color: #58a6ff; }
+
         /* --- Loading overlay --- */
         .loading-overlay {
             position: fixed; inset: 0; background: #0d1117ee;
@@ -211,6 +219,7 @@
     <div class="top-bar">
         <h1>OmegaReader</h1>
         <div class="spacer"></div>
+        <button class="stt-toggle" id="sttToggle" onclick="toggleSttMode()">STT: <span class="mode" id="sttModeLabel">Browser</span></button>
         <button class="mic-btn" id="micBtn" onclick="toggleVoiceCommand()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
     </div>
     <div class="book-grid" id="bookGrid">
@@ -750,12 +759,90 @@ document.addEventListener('keydown', e => {
 // ---------------------------------------------------------------------------
 // Voice Command (mic → STT → note agent)
 // ---------------------------------------------------------------------------
+// STT mode: 'browser' (Web Speech API, no GPU needed) or 'gpu' (Whisper via server)
+let sttMode = localStorage.getItem('sttMode') || 'browser';
 let mediaRecorder = null;
 let audioChunks = [];
+let speechRecognition = null;
+
+function toggleSttMode() {
+    sttMode = sttMode === 'browser' ? 'gpu' : 'browser';
+    localStorage.setItem('sttMode', sttMode);
+    document.getElementById('sttModeLabel').textContent = sttMode === 'browser' ? 'Browser' : 'GPU';
+    toast('STT: ' + (sttMode === 'browser' ? 'Browser (no GPU needed)' : 'GPU (Whisper)'));
+}
+// Init label
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('sttModeLabel').textContent = sttMode === 'browser' ? 'Browser' : 'GPU';
+});
 
 async function toggleVoiceCommand() {
-    // Start recording immediately
     const overlay = document.getElementById('voiceOverlay');
+    overlay.classList.remove('hidden');
+    document.getElementById('stopBtn').classList.remove('hidden');
+    document.getElementById('closeBtn').classList.add('hidden');
+    document.getElementById('voiceTranscript').textContent = '';
+    document.getElementById('voiceResponse').textContent = '';
+    document.getElementById('voiceResponse').classList.add('hidden');
+
+    if (sttMode === 'browser') {
+        startBrowserSTT();
+    } else {
+        startGpuSTT();
+    }
+}
+
+// --- Browser STT (Web Speech API) ---
+function startBrowserSTT() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        document.getElementById('voiceStatus').textContent = 'Browser STT not supported — switch to GPU mode';
+        document.getElementById('closeBtn').classList.remove('hidden');
+        document.getElementById('stopBtn').classList.add('hidden');
+        return;
+    }
+
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.lang = 'en-US';
+    speechRecognition.interimResults = true;
+    speechRecognition.continuous = false;
+
+    document.getElementById('voiceStatus').textContent = 'Listening...';
+
+    speechRecognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+        document.getElementById('voiceTranscript').textContent = 'You said: ' + transcript;
+
+        // When we get a final result, process it
+        if (event.results[event.results.length - 1].isFinal) {
+            document.getElementById('stopBtn').classList.add('hidden');
+            sendToNoteAgent(transcript.trim());
+        }
+    };
+
+    speechRecognition.onerror = (e) => {
+        document.getElementById('voiceStatus').textContent = 'Error: ' + e.error;
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('closeBtn').classList.remove('hidden');
+    };
+
+    speechRecognition.onend = () => {
+        // If no final result was processed, show close
+        document.getElementById('stopBtn').classList.add('hidden');
+        if (!document.getElementById('voiceResponse').textContent) {
+            document.getElementById('closeBtn').classList.remove('hidden');
+        }
+    };
+
+    speechRecognition.start();
+}
+
+// --- GPU STT (Whisper via server) ---
+async function startGpuSTT() {
+    document.getElementById('voiceStatus').textContent = 'Recording...';
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -764,40 +851,22 @@ async function toggleVoiceCommand() {
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
             stream.getTracks().forEach(t => t.stop());
-            await processVoiceCommand();
+            await processGpuSTT();
         };
 
         mediaRecorder.start();
-
-        // Show overlay in recording state
-        overlay.classList.remove('hidden');
-        document.getElementById('voiceStatus').textContent = 'Listening...';
-        document.getElementById('stopBtn').classList.remove('hidden');
-        document.getElementById('closeBtn').classList.add('hidden');
-        document.getElementById('voiceTranscript').textContent = '';
-        document.getElementById('voiceResponse').textContent = '';
-        document.getElementById('voiceResponse').classList.add('hidden');
     } catch (e) {
-        toast('Mic access denied: ' + e.message);
+        document.getElementById('voiceStatus').textContent = 'Mic error: ' + e.message;
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('closeBtn').classList.remove('hidden');
     }
 }
 
-function stopVoiceRecording() {
-    document.getElementById('stopBtn').classList.add('hidden');
-    document.getElementById('voiceStatus').textContent = 'Transcribing...';
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-    }
-}
-
-async function processVoiceCommand() {
+async function processGpuSTT() {
     const statusEl = document.getElementById('voiceStatus');
-    const transcriptEl = document.getElementById('voiceTranscript');
-    const responseEl = document.getElementById('voiceResponse');
     const closeBtn = document.getElementById('closeBtn');
 
-    statusEl.textContent = 'Transcribing...';
-
+    statusEl.textContent = 'Transcribing via GPU...';
     try {
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         const form = new FormData();
@@ -808,17 +877,36 @@ async function processVoiceCommand() {
             throw new Error(`STT ${sttResp.status}: ${errBody}`);
         }
         const sttData = await sttResp.json();
-        const transcript = sttData.text || sttData.transcript || '';
+        const transcript = (sttData.text || sttData.transcript || '').trim();
 
-        if (!transcript.trim()) {
+        if (!transcript) {
             statusEl.textContent = 'No speech detected';
             closeBtn.classList.remove('hidden');
             return;
         }
 
-        transcriptEl.textContent = 'You said: ' + transcript;
-        statusEl.textContent = 'Thinking...';
+        document.getElementById('voiceTranscript').textContent = 'You said: ' + transcript;
+        await sendToNoteAgent(transcript);
+    } catch (e) {
+        statusEl.textContent = 'Error: ' + e.message;
+        closeBtn.classList.remove('hidden');
+    }
+}
 
+// --- Common: send transcript to note agent ---
+async function sendToNoteAgent(transcript) {
+    const statusEl = document.getElementById('voiceStatus');
+    const responseEl = document.getElementById('voiceResponse');
+    const closeBtn = document.getElementById('closeBtn');
+
+    if (!transcript) {
+        statusEl.textContent = 'No speech detected';
+        closeBtn.classList.remove('hidden');
+        return;
+    }
+
+    statusEl.textContent = 'Thinking...';
+    try {
         const noteResp = await fetch(`${OMEGA}/notes/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -840,8 +928,19 @@ async function processVoiceCommand() {
     closeBtn.classList.remove('hidden');
 }
 
+function stopVoiceRecording() {
+    document.getElementById('stopBtn').classList.add('hidden');
+    if (sttMode === 'browser' && speechRecognition) {
+        speechRecognition.stop();
+    } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        document.getElementById('voiceStatus').textContent = 'Transcribing...';
+        mediaRecorder.stop();
+    }
+}
+
 function closeVoiceOverlay() {
     document.getElementById('voiceOverlay').classList.add('hidden');
+    if (speechRecognition) { try { speechRecognition.abort(); } catch(e) {} speechRecognition = null; }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
 }
 
