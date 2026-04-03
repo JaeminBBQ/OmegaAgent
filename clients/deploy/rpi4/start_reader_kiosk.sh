@@ -58,6 +58,7 @@ CHROMIUM_FLAGS=(
     --touch-events=enabled
     --use-fake-ui-for-media-stream
     --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080"
+    --enable-features=WebRTCPipeWireCapturer
 )
 
 # Kill any existing kiosk instances
@@ -130,6 +131,7 @@ exec chromium-browser \\
     --touch-events=enabled \\
     --use-fake-ui-for-media-stream \\
     --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080" \\
+    --enable-features=WebRTCPipeWireCapturer \\
     "${READER_URL}"
 XINIT_EOF
     chmod +x "$XINITRC"
