@@ -6,6 +6,15 @@ set -e
 OMEGA_HOST="${OMEGA_HOST:-172.16.0.200}"
 READER_URL="http://${OMEGA_HOST}:8080/reading/ui"
 
+# Ensure we can talk to the display server
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/jaeminbbq/.Xauthority}"
+# For Wayland (labwc / wayfire on newer Raspberry Pi OS)
+if [ -z "$WAYLAND_DISPLAY" ] && [ -S "/run/user/$(id -u)/wayland-0" ]; then
+    export WAYLAND_DISPLAY=wayland-0
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
+
 # Wait for network + OmegaAgent to be reachable
 echo "[reader] Waiting for OmegaAgent at ${OMEGA_HOST}..."
 for i in $(seq 1 60); do
