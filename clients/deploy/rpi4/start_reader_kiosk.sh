@@ -71,11 +71,22 @@ elif [ "$SESSION" = "wayland" ]; then
 else
     # TTY / no desktop — use cage as a minimal Wayland compositor
     if ! command -v cage >/dev/null 2>&1; then
-        echo "[reader] ERROR: No display server and 'cage' is not installed."
-        echo "[reader] Install it with:  sudo apt install cage"
+        echo "[reader] ERROR: 'cage' is not installed."
+        echo "[reader] Install:  sudo apt install cage seatd"
         exit 1
     fi
-    echo "[reader] No desktop detected — launching cage kiosk compositor..."
-    # cage runs a single app fullscreen with no decorations
+
+    # cage needs a physical TTY — refuse to run from SSH
+    if [ -n "$SSH_CONNECTION" ] || [ -n "$SSH_TTY" ]; then
+        echo "[reader] ERROR: cage cannot run from SSH."
+        echo "[reader] This script must run from the physical console (autologin on tty1)."
+        echo "[reader] Setup:"
+        echo "[reader]   1. sudo raspi-config → System Options → Boot / Auto Login → Console Autologin"
+        echo "[reader]   2. sudo usermod -aG video,input,render jaeminbbq"
+        echo "[reader]   3. Reboot — it will launch automatically from .bash_profile"
+        exit 1
+    fi
+
+    echo "[reader] Launching cage kiosk compositor on $(tty)..."
     exec cage -- chromium-browser "${CHROMIUM_FLAGS[@]}" "${READER_URL}"
 fi
