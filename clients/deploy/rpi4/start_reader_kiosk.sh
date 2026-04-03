@@ -63,6 +63,14 @@ CHROMIUM_FLAGS=(
 
 # Kill any existing kiosk instances
 pkill -f "chromium.*kiosk" 2>/dev/null || true
+pkill -f "mic_server.py" 2>/dev/null || true
+sleep 1
+
+# Start local mic recording server (bridges pw-record → browser)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+python3 "$SCRIPT_DIR/mic_server.py" --port 9099 &
+MIC_PID=$!
+echo "[reader] Mic server started (PID $MIC_PID)"
 sleep 1
 
 # Detect display environment

@@ -765,22 +765,26 @@ document.addEventListener('keydown', e => {
 // ---------------------------------------------------------------------------
 // Voice Command (mic → STT → note agent)
 // ---------------------------------------------------------------------------
-// STT mode: 'browser' (Web Speech API, no GPU needed) or 'gpu' (Whisper via server)
-let sttMode = localStorage.getItem('sttMode') || 'browser';
+// STT modes: 'local' (pw-record via mic server), 'browser' (Web Speech API), 'gpu' (Whisper)
+const STT_MODES = ['local', 'browser', 'gpu'];
+const STT_LABELS = { local: 'Local', browser: 'Browser', gpu: 'GPU' };
+const STT_DESC = { local: 'Local mic (pw-record)', browser: 'Browser (Web Speech API)', gpu: 'GPU (Whisper)' };
+let sttMode = localStorage.getItem('sttMode') || 'local';
 let mediaRecorder = null;
 let audioChunks = [];
 let speechRecognition = null;
-let sttStopping = false; // flag to suppress abort errors
+let sttStopping = false;
+let localRecordAbort = null; // AbortController for local recording
 
 function toggleSttMode() {
-    sttMode = sttMode === 'browser' ? 'gpu' : 'browser';
+    const idx = (STT_MODES.indexOf(sttMode) + 1) % STT_MODES.length;
+    sttMode = STT_MODES[idx];
     localStorage.setItem('sttMode', sttMode);
-    document.getElementById('sttModeLabel').textContent = sttMode === 'browser' ? 'Browser' : 'GPU';
-    toast('STT: ' + (sttMode === 'browser' ? 'Browser (no GPU needed)' : 'GPU (Whisper)'));
+    document.getElementById('sttModeLabel').textContent = STT_LABELS[sttMode];
+    toast('STT: ' + STT_DESC[sttMode]);
 }
-// Init label
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('sttModeLabel').textContent = sttMode === 'browser' ? 'Browser' : 'GPU';
+    document.getElementById('sttModeLabel').textContent = STT_LABELS[sttMode];
 });
 
 async function toggleVoiceCommand() {
@@ -792,11 +796,72 @@ async function toggleVoiceCommand() {
     document.getElementById('voiceResponse').textContent = '';
     document.getElementById('voiceResponse').classList.add('hidden');
 
-    if (sttMode === 'browser') {
+    if (sttMode === 'local') {
+        startLocalSTT();
+    } else if (sttMode === 'browser') {
         startBrowserSTT();
     } else {
         startGpuSTT();
     }
+}
+
+// --- Local STT (pw-record via mic_server on RPi) ---
+const MIC_SERVER = 'http://' + window.location.hostname + ':9099';
+
+async function startLocalSTT() {
+    const statusEl = document.getElementById('voiceStatus');
+    const closeBtn = document.getElementById('closeBtn');
+    statusEl.textContent = 'Recording (local mic)...';
+
+    // STOP button will abort the fetch, triggering the recording to end
+    localRecordAbort = new AbortController();
+
+    try {
+        const resp = await fetch(`${MIC_SERVER}/record?duration=10`, {
+            method: 'POST',
+            signal: localRecordAbort.signal,
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ error: 'Unknown' }));
+            throw new Error(err.error || `Server ${resp.status}`);
+        }
+
+        const wavBlob = await resp.blob();
+        document.getElementById('stopBtn').classList.add('hidden');
+        statusEl.textContent = 'Transcribing...';
+
+        // Send WAV to OmegaAgent for Whisper STT
+        const form = new FormData();
+        form.append('file', wavBlob, 'voice.wav');
+        const sttResp = await fetch(`${OMEGA}/speech/transcribe`, { method: 'POST', body: form });
+        if (!sttResp.ok) {
+            const errBody = await sttResp.text();
+            throw new Error(`STT ${sttResp.status}: ${errBody}`);
+        }
+        const sttData = await sttResp.json();
+        const transcript = (sttData.text || sttData.transcript || '').trim();
+
+        if (!transcript) {
+            statusEl.textContent = 'No speech detected';
+            closeBtn.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('voiceTranscript').textContent = 'You said: ' + transcript;
+        await sendToNoteAgent(transcript);
+
+    } catch (e) {
+        if (e.name === 'AbortError') {
+            // User pressed stop — that's fine, the server returns what it recorded
+            statusEl.textContent = 'Stopped';
+            closeBtn.classList.remove('hidden');
+        } else {
+            statusEl.textContent = 'Error: ' + e.message;
+            closeBtn.classList.remove('hidden');
+        }
+    }
+    localRecordAbort = null;
 }
 
 // --- Find EMEET mic by enumerating devices ---
@@ -1024,7 +1089,10 @@ async function sendToNoteAgent(transcript) {
 function stopVoiceRecording() {
     document.getElementById('stopBtn').classList.add('hidden');
     document.getElementById('voiceStatus').textContent = 'Processing...';
-    if (sttMode === 'browser' && speechRecognition) {
+    if (sttMode === 'local' && localRecordAbort) {
+        localRecordAbort.abort();
+        localRecordAbort = null;
+    } else if (sttMode === 'browser' && speechRecognition) {
         sttStopping = true;
         stopVolumeMeter();
         if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
