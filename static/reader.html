@@ -803,7 +803,10 @@ async function processVoiceCommand() {
         const form = new FormData();
         form.append('file', blob, 'voice.webm');
         const sttResp = await fetch(`${OMEGA}/speech/transcribe`, { method: 'POST', body: form });
-        if (!sttResp.ok) throw new Error('Transcription failed');
+        if (!sttResp.ok) {
+            const errBody = await sttResp.text();
+            throw new Error(`STT ${sttResp.status}: ${errBody}`);
+        }
         const sttData = await sttResp.json();
         const transcript = sttData.text || sttData.transcript || '';
 
@@ -821,7 +824,10 @@ async function processVoiceCommand() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: transcript }),
         });
-        if (!noteResp.ok) throw new Error('Note agent failed');
+        if (!noteResp.ok) {
+            const errBody = await noteResp.text();
+            throw new Error(`Note ${noteResp.status}: ${errBody}`);
+        }
         const noteData = await noteResp.json();
         const reply = noteData.response || noteData.reply || JSON.stringify(noteData);
 
