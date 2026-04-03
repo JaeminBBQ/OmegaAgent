@@ -765,6 +765,7 @@ let sttMode = localStorage.getItem('sttMode') || 'browser';
 let mediaRecorder = null;
 let audioChunks = [];
 let speechRecognition = null;
+let sttStopping = false; // flag to suppress abort errors
 
 function toggleSttMode() {
     sttMode = sttMode === 'browser' ? 'gpu' : 'browser';
@@ -825,15 +826,21 @@ function startBrowserSTT() {
     };
 
     speechRecognition.onerror = (e) => {
+        if (sttStopping || e.error === 'aborted') return; // ignore intentional abort
         document.getElementById('voiceStatus').textContent = 'Error: ' + e.error;
         document.getElementById('stopBtn').classList.add('hidden');
         document.getElementById('closeBtn').classList.remove('hidden');
     };
 
     speechRecognition.onend = () => {
-        // If no final result was processed, show close
+        if (sttStopping) return; // handled by stopVoiceRecording
+        // Natural end (e.g. silence timeout) — process what we have
         document.getElementById('stopBtn').classList.add('hidden');
-        if (!document.getElementById('voiceResponse').textContent) {
+        const currentText = document.getElementById('voiceTranscript').textContent.replace('You said: ', '').trim();
+        if (currentText) {
+            sendToNoteAgent(currentText);
+        } else {
+            document.getElementById('voiceStatus').textContent = 'No speech detected';
             document.getElementById('closeBtn').classList.remove('hidden');
         }
     };
@@ -933,10 +940,11 @@ function stopVoiceRecording() {
     document.getElementById('stopBtn').classList.add('hidden');
     document.getElementById('voiceStatus').textContent = 'Processing...';
     if (sttMode === 'browser' && speechRecognition) {
-        // Grab whatever interim text we have
+        sttStopping = true;
         const currentText = document.getElementById('voiceTranscript').textContent.replace('You said: ', '').trim();
-        speechRecognition.abort();
+        try { speechRecognition.abort(); } catch(e) {}
         speechRecognition = null;
+        sttStopping = false;
         if (currentText) {
             sendToNoteAgent(currentText);
         } else {
