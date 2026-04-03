@@ -34,6 +34,8 @@ CHROMIUM_FLAGS=(
     --autoplay-policy=no-user-gesture-required
     --check-for-update-interval=31536000
     --touch-events=enabled
+    --use-fake-ui-for-media-stream
+    --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080"
 )
 
 # Kill any existing kiosk instances
@@ -104,6 +106,8 @@ exec chromium-browser \\
     --autoplay-policy=no-user-gesture-required \\
     --check-for-update-interval=31536000 \\
     --touch-events=enabled \\
+    --use-fake-ui-for-media-stream \\
+    --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080" \\
     "${READER_URL}"
 XINIT_EOF
     chmod +x "$XINITRC"
