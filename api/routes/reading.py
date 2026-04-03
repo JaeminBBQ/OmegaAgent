@@ -1,6 +1,7 @@
 """Reading assistant API routes — EPUB upload, chapters, TTS, progress, summaries."""
 
 import logging
+import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -94,6 +95,17 @@ async def get_book(book_id: str):
         raise HTTPException(status_code=404, detail=f"Book not found: {book_id}")
     progress = _load_progress(book_id)
     return {**meta, "progress": progress}
+
+
+@router.delete("/books/{book_id}")
+async def delete_book(book_id: str):
+    """Delete a book and all its data (chapters, summaries, progress)."""
+    from agents.reading.tools import _book_dir
+    book_path = _book_dir(book_id)
+    if not book_path.exists():
+        raise HTTPException(status_code=404, detail=f"Book not found: {book_id}")
+    shutil.rmtree(book_path)
+    return {"deleted": book_id}
 
 
 @router.get("/books/{book_id}/chapters")
@@ -300,4 +312,11 @@ async def reading_ui():
     return HTMLResponse(html_path.read_text())
 
 
-# Old inline HTML removed — now served from static/reader.html
+@router.get("/manage", response_class=HTMLResponse)
+async def reading_manage():
+    """Serve the desktop book management UI (upload, delete, view library)."""
+    static_dir = Path(__file__).resolve().parent.parent.parent / "static"
+    html_path = static_dir / "manage.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="manage.html not found")
+    return HTMLResponse(html_path.read_text())

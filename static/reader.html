@@ -702,6 +702,26 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------------------------------------------------------------------------
+// Upload
+// ---------------------------------------------------------------------------
+async function uploadBook(file) {
+    if (!file) return;
+    showLoading('Processing EPUB...');
+    const form = new FormData();
+    form.append('file', file);
+    try {
+        const resp = await fetch(`${OMEGA}/reading/upload`, { method: 'POST', body: form });
+        if (!resp.ok) throw new Error(await resp.text());
+        toast('Book uploaded!');
+        await loadBooks();
+    } catch (e) {
+        toast('Upload failed: ' + e.message);
+    }
+    hideLoading();
+    document.getElementById('epubUpload').value = '';
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 loadBooks();
