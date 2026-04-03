@@ -19,22 +19,56 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
-# Auto-detect EMEET USB audio and set as ALSA default
+# Auto-detect EMEET USB audio and configure for Chromium
 EMEET_CARD=$(arecord -l 2>/dev/null | grep -i "emeet" | head -1 | sed -n 's/^card \([0-9]*\).*/\1/p')
 if [ -n "$EMEET_CARD" ]; then
-    echo "[reader] EMEET mic found on card $EMEET_CARD — setting as default"
+    echo "[reader] EMEET mic found on ALSA card $EMEET_CARD"
     export ALSA_CARD="$EMEET_CARD"
-    # Write .asoundrc so Chromium uses this device
+
+    # ALSA fallback config (use plug for format conversion)
     cat > "$HOME/.asoundrc" << ASOUND
 pcm.!default {
-    type hw
-    card $EMEET_CARD
+    type plug
+    slave.pcm "hw:${EMEET_CARD},0"
 }
 ctl.!default {
     type hw
     card $EMEET_CARD
 }
 ASOUND
+
+    # Chromium uses PulseAudio — ensure it's running and set EMEET as default
+    if command -v pulseaudio >/dev/null 2>&1; then
+        pulseaudio --check 2>/dev/null || pulseaudio --start --daemonize 2>/dev/null
+        sleep 1
+        # Find and set EMEET as default source (mic input)
+        EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
+        if [ -n "$EMEET_SOURCE" ]; then
+            pactl set-default-source "$EMEET_SOURCE" 2>/dev/null
+            echo "[reader] PulseAudio default source → $EMEET_SOURCE"
+        else
+            echo "[reader] PulseAudio: EMEET source not found, listing sources:"
+            pactl list sources short 2>/dev/null || true
+        fi
+        # Also set EMEET as default sink (speaker output) if available
+        EMEET_SINK=$(pactl list sinks short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
+        if [ -n "$EMEET_SINK" ]; then
+            pactl set-default-sink "$EMEET_SINK" 2>/dev/null
+            echo "[reader] PulseAudio default sink → $EMEET_SINK"
+        fi
+    elif command -v pipewire >/dev/null 2>&1; then
+        # PipeWire with WirePlumber — uses same pactl interface via pipewire-pulse
+        if command -v pactl >/dev/null 2>&1; then
+            sleep 1
+            EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
+            if [ -n "$EMEET_SOURCE" ]; then
+                pactl set-default-source "$EMEET_SOURCE" 2>/dev/null
+                echo "[reader] PipeWire default source → $EMEET_SOURCE"
+            fi
+        fi
+    else
+        echo "[reader] No PulseAudio/PipeWire found — Chromium may not see EMEET mic"
+    fi
 else
     echo "[reader] WARNING: EMEET mic not found. 'arecord -l' shows:"
     arecord -l 2>/dev/null || true
