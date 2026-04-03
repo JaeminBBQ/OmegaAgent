@@ -6,6 +6,7 @@
     <title>OmegaReader</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        .hidden { display: none !important; }
         html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         body { font-family: 'Georgia', 'Times New Roman', serif; background: #0d1117; color: #c9d1d9; }
 
@@ -930,11 +931,24 @@ async function sendToNoteAgent(transcript) {
 
 function stopVoiceRecording() {
     document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('voiceStatus').textContent = 'Processing...';
     if (sttMode === 'browser' && speechRecognition) {
-        speechRecognition.stop();
+        // Grab whatever interim text we have
+        const currentText = document.getElementById('voiceTranscript').textContent.replace('You said: ', '').trim();
+        speechRecognition.abort();
+        speechRecognition = null;
+        if (currentText) {
+            sendToNoteAgent(currentText);
+        } else {
+            document.getElementById('voiceStatus').textContent = 'No speech detected';
+            document.getElementById('closeBtn').classList.remove('hidden');
+        }
     } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         document.getElementById('voiceStatus').textContent = 'Transcribing...';
         mediaRecorder.stop();
+    } else {
+        document.getElementById('voiceStatus').textContent = 'Nothing recorded';
+        document.getElementById('closeBtn').classList.remove('hidden');
     }
 }
 
