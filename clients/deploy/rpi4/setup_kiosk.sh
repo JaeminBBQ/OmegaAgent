@@ -5,19 +5,21 @@ set -e
 
 echo "=== OmegaReader Kiosk Setup ==="
 
-# 1. Install cage + seatd
-echo "[1/4] Installing cage and seatd..."
+# 1. Install X11 minimal + Chromium
+echo "[1/3] Installing X11 kiosk packages..."
 sudo apt update
-sudo apt install -y cage seatd chromium-browser
+sudo apt install -y xserver-xorg xinit x11-xserver-utils chromium-browser unclutter
 
-# 2. Add user to required groups
-echo "[2/4] Adding $(whoami) to video, input, render groups..."
-sudo usermod -aG video,input,render "$(whoami)"
+# 2. Add user to required groups for display + input access
+echo "[2/3] Adding $(whoami) to video, input, render, tty groups..."
+sudo usermod -aG video,input,render,tty "$(whoami)"
 
-# 3. Enable seatd service
-echo "[3/4] Enabling seatd..."
-sudo systemctl enable seatd
-sudo systemctl start seatd
+# 3. Allow xinit from console without root
+echo "[3/3] Configuring Xwrapper..."
+sudo tee /etc/X11/Xwrapper.config > /dev/null << 'XWRAP'
+allowed_users=anybody
+needs_root_rights=yes
+XWRAP
 
 # 4. Add auto-launch to .bash_profile (only on tty1)
 KIOSK_SCRIPT="$HOME/Projects/OmegaAgent/clients/deploy/rpi4/start_reader_kiosk.sh"
