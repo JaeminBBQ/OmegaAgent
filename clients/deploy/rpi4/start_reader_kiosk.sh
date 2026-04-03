@@ -19,28 +19,6 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
-# Remove any .asoundrc that conflicts with PipeWire
-rm -f "$HOME/.asoundrc"
-
-# Set EMEET as default mic/speaker via PipeWire (pactl)
-if command -v pactl >/dev/null 2>&1; then
-    EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | grep -v monitor | head -1 | awk '{print $2}')
-    if [ -n "$EMEET_SOURCE" ]; then
-        pactl set-default-source "$EMEET_SOURCE" 2>/dev/null
-        echo "[reader] Default mic → $EMEET_SOURCE"
-    else
-        echo "[reader] EMEET mic not found in PipeWire sources:"
-        pactl list sources short 2>/dev/null || true
-    fi
-    EMEET_SINK=$(pactl list sinks short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
-    if [ -n "$EMEET_SINK" ]; then
-        pactl set-default-sink "$EMEET_SINK" 2>/dev/null
-        echo "[reader] Default speaker → $EMEET_SINK"
-    fi
-else
-    echo "[reader] pactl not found — Chromium may not detect EMEET mic"
-fi
-
 # Chromium flags (no keyring, kiosk, autoplay audio, touch)
 CHROMIUM_FLAGS=(
     --kiosk
@@ -56,21 +34,11 @@ CHROMIUM_FLAGS=(
     --autoplay-policy=no-user-gesture-required
     --check-for-update-interval=31536000
     --touch-events=enabled
-    --use-fake-ui-for-media-stream
     --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080"
-    --enable-features=WebRTCPipeWireCapturer
 )
 
 # Kill any existing kiosk instances
 pkill -f "chromium.*kiosk" 2>/dev/null || true
-pkill -f "mic_server.py" 2>/dev/null || true
-sleep 1
-
-# Start local mic recording server (bridges pw-record → browser)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-python3 "$SCRIPT_DIR/mic_server.py" --port 9099 &
-MIC_PID=$!
-echo "[reader] Mic server started (PID $MIC_PID)"
 sleep 1
 
 # Detect display environment
@@ -137,9 +105,7 @@ exec chromium-browser \\
     --autoplay-policy=no-user-gesture-required \\
     --check-for-update-interval=31536000 \\
     --touch-events=enabled \\
-    --use-fake-ui-for-media-stream \\
     --unsafely-treat-insecure-origin-as-secure="http://${OMEGA_HOST}:8080" \\
-    --enable-features=WebRTCPipeWireCapturer \\
     "${READER_URL}"
 XINIT_EOF
     chmod +x "$XINITRC"
