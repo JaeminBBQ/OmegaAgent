@@ -19,7 +19,7 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
-# Common Chromium flags (no keyring prompt, kiosk, autoplay audio)
+# Common Chromium flags (no keyring prompt, kiosk, autoplay audio, touch enabled)
 CHROMIUM_FLAGS=(
     --kiosk
     --noerrdialogs
@@ -33,8 +33,26 @@ CHROMIUM_FLAGS=(
     --disable-features=LockProfileCookieDatabase
     --autoplay-policy=no-user-gesture-required
     --check-for-update-interval=31536000
+    --touch-events=enabled
     --enable-features=UseOzonePlatform
     --ozone-platform=wayland
+)
+
+# Fallback flags for XWayland (if native Wayland touch doesn't work)
+CHROMIUM_FLAGS_XWAYLAND=(
+    --kiosk
+    --noerrdialogs
+    --disable-infobars
+    --disable-session-crashed-bubble
+    --disable-restore-session-state
+    --disable-translate
+    --no-first-run
+    --start-fullscreen
+    --password-store=basic
+    --disable-features=LockProfileCookieDatabase
+    --autoplay-policy=no-user-gesture-required
+    --check-for-update-interval=31536000
+    --touch-events=enabled
 )
 
 # Kill any existing kiosk instances
@@ -88,5 +106,13 @@ else
     fi
 
     echo "[reader] Launching cage kiosk compositor on $(tty)..."
-    exec cage -- chromium-browser "${CHROMIUM_FLAGS[@]}" "${READER_URL}"
+    # Use KIOSK_MODE=wayland for native Wayland, or xwayland (default) for better touch
+    KIOSK_MODE="${KIOSK_MODE:-xwayland}"
+    if [ "$KIOSK_MODE" = "wayland" ]; then
+        echo "[reader] Mode: native Wayland"
+        exec cage -- chromium-browser "${CHROMIUM_FLAGS[@]}" "${READER_URL}"
+    else
+        echo "[reader] Mode: XWayland (better touch support)"
+        exec cage -- chromium-browser "${CHROMIUM_FLAGS_XWAYLAND[@]}" "${READER_URL}"
+    fi
 fi
