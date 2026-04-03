@@ -37,37 +37,23 @@ ctl.!default {
 }
 ASOUND
 
-    # Chromium uses PulseAudio — ensure it's running and set EMEET as default
-    if command -v pulseaudio >/dev/null 2>&1; then
-        pulseaudio --check 2>/dev/null || pulseaudio --start --daemonize 2>/dev/null
-        sleep 1
-        # Find and set EMEET as default source (mic input)
-        EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
+    # Set EMEET as default source/sink via pactl (works with PipeWire + PulseAudio)
+    if command -v pactl >/dev/null 2>&1; then
+        EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | grep -v monitor | head -1 | awk '{print $2}')
         if [ -n "$EMEET_SOURCE" ]; then
             pactl set-default-source "$EMEET_SOURCE" 2>/dev/null
-            echo "[reader] PulseAudio default source → $EMEET_SOURCE"
+            echo "[reader] Default mic → $EMEET_SOURCE"
         else
-            echo "[reader] PulseAudio: EMEET source not found, listing sources:"
+            echo "[reader] EMEET not found in pactl sources:"
             pactl list sources short 2>/dev/null || true
         fi
-        # Also set EMEET as default sink (speaker output) if available
         EMEET_SINK=$(pactl list sinks short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
         if [ -n "$EMEET_SINK" ]; then
             pactl set-default-sink "$EMEET_SINK" 2>/dev/null
-            echo "[reader] PulseAudio default sink → $EMEET_SINK"
-        fi
-    elif command -v pipewire >/dev/null 2>&1; then
-        # PipeWire with WirePlumber — uses same pactl interface via pipewire-pulse
-        if command -v pactl >/dev/null 2>&1; then
-            sleep 1
-            EMEET_SOURCE=$(pactl list sources short 2>/dev/null | grep -i "emeet" | head -1 | awk '{print $2}')
-            if [ -n "$EMEET_SOURCE" ]; then
-                pactl set-default-source "$EMEET_SOURCE" 2>/dev/null
-                echo "[reader] PipeWire default source → $EMEET_SOURCE"
-            fi
+            echo "[reader] Default speaker → $EMEET_SINK"
         fi
     else
-        echo "[reader] No PulseAudio/PipeWire found — Chromium may not see EMEET mic"
+        echo "[reader] pactl not found — Chromium may not detect EMEET mic"
     fi
 else
     echo "[reader] WARNING: EMEET mic not found. 'arecord -l' shows:"
