@@ -173,7 +173,7 @@
 <!-- ==================== LIBRARY SCREEN ==================== -->
 <div class="screen active" id="screenLibrary">
     <div class="top-bar">
-        <h1>📖 OmegaReader</h1>
+        <h1>OmegaReader</h1>
         <div class="spacer"></div>
     </div>
     <div class="book-grid" id="bookGrid">
@@ -221,10 +221,10 @@
             <input type="range" min="0.6" max="1.6" step="0.1" value="1.0"
                    oninput="setSpeed(this.value)" style="width:60px;accent-color:#58a6ff">
         </div>
-        <button class="ctrl-btn" onclick="prevChapter()">⏮</button>
-        <button class="ctrl-btn play" id="btnPlay" onclick="togglePlay()">▶ Play</button>
-        <button class="ctrl-btn" onclick="nextChapter()">⏭</button>
-        <button class="ctrl-btn" onclick="summarizeChapter()" id="btnSummary">📝</button>
+        <button class="ctrl-btn" onclick="prevChapter()">&laquo; Prev</button>
+        <button class="ctrl-btn play" id="btnPlay" onclick="togglePlay()">&#9654; Play</button>
+        <button class="ctrl-btn" onclick="nextChapter()">Next &raquo;</button>
+        <button class="ctrl-btn" onclick="summarizeChapter()" id="btnSummary">Summary</button>
     </div>
 </div>
 
@@ -513,10 +513,10 @@ function stopPlay() {
 function updatePlayButton() {
     const btn = document.getElementById('btnPlay');
     if (isPlaying) {
-        btn.textContent = '⏸ Stop';
+        btn.textContent = '\u25A0 Stop';
         btn.classList.add('playing');
     } else {
-        btn.textContent = '▶ Play';
+        btn.textContent = '\u25B6 Play';
         btn.classList.remove('playing');
     }
 }
