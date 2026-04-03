@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=OmegaReader Kiosk
+Comment=Launch OmegaReader in fullscreen kiosk mode
+Exec=bash /home/jaeminbbq/Projects/OmegaAgent/clients/deploy/rpi4/start_reader_kiosk.sh
+Terminal=false
+X-GNOME-Autostart-Delay=10

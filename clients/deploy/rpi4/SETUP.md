@@ -54,6 +54,55 @@ Add to crontab (`crontab -e`):
 
 Then attach to see it: `tmux attach -t omega-voice`
 
+---
+
+## OmegaReader — Kiosk Mode (fullscreen reading UI)
+
+### Prerequisites
+```bash
+sudo apt install chromium-browser unclutter
+```
+
+### Setup
+```bash
+# Make kiosk script executable
+chmod +x ~/Projects/OmegaAgent/clients/deploy/rpi4/start_reader_kiosk.sh
+
+# Copy desktop autostart file
+mkdir -p ~/.config/autostart
+cp ~/Projects/OmegaAgent/clients/deploy/rpi4/omega-reader.desktop ~/.config/autostart/
+```
+
+### Manual Launch
+```bash
+OMEGA_HOST=172.16.0.200 bash ~/Projects/OmegaAgent/clients/deploy/rpi4/start_reader_kiosk.sh
+```
+
+### What It Does
+- Waits for OmegaAgent server to be reachable
+- Disables screen blanking and power management
+- Hides cursor after 3 seconds of inactivity
+- Launches Chromium in fullscreen kiosk mode at `http://172.16.0.200:8080/reading/ui`
+- Autoplay policy allows TTS audio without user gesture
+
+### Exit Kiosk
+Press `Alt+F4` to close Chromium, or SSH in and run:
+```bash
+pkill -f "chromium.*kiosk"
+```
+
+### Upload Books
+From any computer on the network, navigate to:
+```
+http://172.16.0.200:8080/reading/ui
+```
+Or use curl:
+```bash
+curl -F "file=@mybook.epub" http://172.16.0.200:8080/reading/upload
+```
+
+---
+
 ## Troubleshooting
 - **No audio device**: Check `python3 -c "import sounddevice as sd; print(sd.query_devices())"`
 - **Wake word not loading**: Run `python3 -c "import openwakeword; openwakeword.utils.download_models()"`
