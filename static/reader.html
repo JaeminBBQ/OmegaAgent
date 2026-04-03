@@ -183,6 +183,10 @@
         }
         .stop-btn:active { background: #b62324; }
 
+        .vol-meter { width: 200px; height: 8px; background: #21262d; border-radius: 4px; margin-bottom: 16px; overflow: hidden; }
+        .vol-meter .vol-bar { height: 100%; width: 0%; background: #3fb950; border-radius: 4px; transition: width 0.1s; }
+        .vol-meter .vol-bar.loud { background: #da3633; }
+
         .stt-toggle {
             padding: 4px 10px; border-radius: 12px; border: 1px solid #30363d;
             background: #21262d; color: #8b949e; font-size: 0.75em; cursor: pointer;
@@ -281,6 +285,7 @@
 <!-- Voice command overlay -->
 <div class="voice-overlay hidden" id="voiceOverlay">
     <div class="status" id="voiceStatus">Recording...</div>
+    <div class="vol-meter" id="volMeter"><div class="vol-bar" id="volBar"></div></div>
     <button class="stop-btn" id="stopBtn" onclick="stopVoiceRecording()">STOP</button>
     <div class="transcript" id="voiceTranscript"></div>
     <div class="response hidden" id="voiceResponse"></div>
@@ -794,6 +799,43 @@ async function toggleVoiceCommand() {
     }
 }
 
+// --- Audio level monitor ---
+let audioCtx = null;
+let analyser = null;
+let micStream = null;
+let volAnimFrame = null;
+
+function startVolumeMeter(stream) {
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        micStream = stream;
+        updateVolume();
+    } catch(e) { console.warn('Volume meter failed:', e); }
+}
+
+function updateVolume() {
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    const avg = data.reduce((a, b) => a + b, 0) / data.length;
+    const pct = Math.min(100, (avg / 128) * 100);
+    const bar = document.getElementById('volBar');
+    bar.style.width = pct + '%';
+    bar.className = 'vol-bar' + (pct > 60 ? ' loud' : '');
+    volAnimFrame = requestAnimationFrame(updateVolume);
+}
+
+function stopVolumeMeter() {
+    if (volAnimFrame) cancelAnimationFrame(volAnimFrame);
+    if (audioCtx) { try { audioCtx.close(); } catch(e) {} audioCtx = null; }
+    analyser = null;
+    document.getElementById('volBar').style.width = '0%';
+}
+
 // --- Browser STT (Web Speech API) ---
 function startBrowserSTT() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -804,12 +846,22 @@ function startBrowserSTT() {
         return;
     }
 
+    // Start mic just for volume meter
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        startVolumeMeter(stream);
+    }).catch(e => {
+        document.getElementById('voiceStatus').textContent = 'No mic found: ' + e.message;
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('closeBtn').classList.remove('hidden');
+        return;
+    });
+
     speechRecognition = new SpeechRecognition();
     speechRecognition.lang = 'en-US';
     speechRecognition.interimResults = true;
     speechRecognition.continuous = false;
 
-    document.getElementById('voiceStatus').textContent = 'Listening...';
+    document.getElementById('voiceStatus').textContent = 'Listening... (speak now)';
 
     speechRecognition.onresult = (event) => {
         let transcript = '';
@@ -941,6 +993,8 @@ function stopVoiceRecording() {
     document.getElementById('voiceStatus').textContent = 'Processing...';
     if (sttMode === 'browser' && speechRecognition) {
         sttStopping = true;
+        stopVolumeMeter();
+        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
         const currentText = document.getElementById('voiceTranscript').textContent.replace('You said: ', '').trim();
         try { speechRecognition.abort(); } catch(e) {}
         speechRecognition = null;
@@ -962,6 +1016,8 @@ function stopVoiceRecording() {
 
 function closeVoiceOverlay() {
     document.getElementById('voiceOverlay').classList.add('hidden');
+    stopVolumeMeter();
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
     if (speechRecognition) { try { speechRecognition.abort(); } catch(e) {} speechRecognition = null; }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
 }
