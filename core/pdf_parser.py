@@ -111,14 +111,12 @@ class PDFParser:
             return ""
         
         first_page = doc[0]
-        text = first_page.get_text()
         
-        # Split into lines and find the largest font size (likely title)
+        # Method 1: Find text with largest font size
         blocks = first_page.get_text("dict")["blocks"]
         
-        max_font_size = 0
-        title_text = ""
-        
+        # Collect all text at each font size
+        font_texts = {}
         for block in blocks:
             if "lines" not in block:
                 continue
@@ -126,13 +124,35 @@ class PDFParser:
             for line in block["lines"]:
                 for span in line["spans"]:
                     font_size = span.get("size", 0)
-                    if font_size > max_font_size:
-                        max_font_size = font_size
-                        title_text = span.get("text", "").strip()
+                    text = span.get("text", "").strip()
+                    if text and font_size > 0:
+                        if font_size not in font_texts:
+                            font_texts[font_size] = []
+                        font_texts[font_size].append(text)
         
-        # Clean up title
-        title_text = re.sub(r'\s+', ' ', title_text)
-        return title_text[:200]  # Limit length
+        # Get text from largest font size
+        if font_texts:
+            max_font_size = max(font_texts.keys())
+            title_parts = font_texts[max_font_size]
+            title_text = " ".join(title_parts)
+            
+            # Clean up and validate
+            title_text = re.sub(r'\s+', ' ', title_text).strip()
+            
+            # Check if it looks like a valid title (at least 10 chars, not all numbers)
+            if len(title_text) >= 10 and not title_text.replace(' ', '').isdigit():
+                return title_text[:200]
+        
+        # Method 2: Fallback - extract first substantial line from plain text
+        plain_text = first_page.get_text()
+        lines = [line.strip() for line in plain_text.split('\n') if line.strip()]
+        
+        for line in lines[:10]:  # Check first 10 lines
+            # Skip very short lines, page numbers, dates
+            if len(line) >= 15 and not re.match(r'^[\d\s\-/]+$', line):
+                return line[:200]
+        
+        return ""
 
     def _parse_authors(self, authors_str: str) -> List[str]:
         """Parse author string into list."""
