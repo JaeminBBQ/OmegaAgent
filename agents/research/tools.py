@@ -14,11 +14,15 @@ from langchain_core.tools import tool
 from langchain_anthropic import ChatAnthropic
 
 from core.config import ANTHROPIC_API_KEY
+from core.embeddings import EmbeddingsClient
+from core.research_db import ResearchDB
 
 logger = logging.getLogger(__name__)
 
-# Sonnet model for advanced analysis
+# Lazy-loaded clients
 _sonnet = None
+_embeddings = None
+_research_db = None
 
 
 def _get_sonnet():
@@ -33,6 +37,22 @@ def _get_sonnet():
     return _sonnet
 
 
+def _get_embeddings():
+    """Lazy load embeddings client."""
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = EmbeddingsClient()
+    return _embeddings
+
+
+def _get_research_db():
+    """Lazy load research DB client."""
+    global _research_db
+    if _research_db is None:
+        _research_db = ResearchDB()
+    return _research_db
+
+
 @tool
 async def search_papers(query: str, limit: int = 5) -> str:
     """Search academic papers using semantic similarity.
@@ -44,9 +64,49 @@ async def search_papers(query: str, limit: int = 5) -> str:
         query: Search query (natural language question or keywords)
         limit: Max number of results (default 5)
     """
-    # TODO: Implement RAG retrieval from Supabase
-    # For now, return placeholder
-    return f"[Paper search not yet implemented. Query: {query}]"
+    try:
+        embeddings_client = _get_embeddings()
+        db = _get_research_db()
+        
+        # Generate query embedding
+        query_embedding = await embeddings_client.embed_text(query)
+        
+        # Search papers
+        results = await db.search_paper_chunks(
+            query_embedding=query_embedding,
+            threshold=0.7,
+            limit=limit,
+        )
+        
+        if not results:
+            return "No relevant papers found for this query."
+        
+        # Format results
+        formatted = []
+        for i, result in enumerate(results, 1):
+            title = result.get("paper_title", "Unknown")
+            authors = result.get("paper_authors", [])
+            content = result.get("chunk_content", "")
+            page = result.get("page_number")
+            similarity = result.get("similarity", 0)
+            
+            author_str = ", ".join(authors[:2]) if authors else "Unknown"
+            if len(authors) > 2:
+                author_str += " et al."
+            
+            page_str = f" (p. {page})" if page else ""
+            
+            formatted.append(
+                f"{i}. **{title}** by {author_str}{page_str}\n"
+                f"   Relevance: {similarity:.2f}\n"
+                f"   {content[:300]}..."
+            )
+        
+        return "\n\n".join(formatted)
+        
+    except Exception as e:
+        logger.error(f"Paper search failed: {e}", exc_info=True)
+        return f"Paper search error: {e}"
 
 
 @tool
@@ -60,8 +120,43 @@ async def search_research_notes(query: str, limit: int = 5) -> str:
         query: Search query
         limit: Max number of results (default 5)
     """
-    # TODO: Implement note search from Obsidian vault
-    return f"[Note search not yet implemented. Query: {query}]"
+    try:
+        embeddings_client = _get_embeddings()
+        db = _get_research_db()
+        
+        # Generate query embedding
+        query_embedding = await embeddings_client.embed_text(query)
+        
+        # Search notes
+        results = await db.search_research_notes(
+            query_embedding=query_embedding,
+            threshold=0.7,
+            limit=limit,
+        )
+        
+        if not results:
+            return "No relevant research notes found for this query."
+        
+        # Format results
+        formatted = []
+        for i, result in enumerate(results, 1):
+            title = result.get("note_title", "Untitled")
+            content = result.get("note_content", "")
+            file_path = result.get("file_path", "")
+            similarity = result.get("similarity", 0)
+            
+            formatted.append(
+                f"{i}. **{title}**\n"
+                f"   File: {file_path}\n"
+                f"   Relevance: {similarity:.2f}\n"
+                f"   {content[:300]}..."
+            )
+        
+        return "\n\n".join(formatted)
+        
+    except Exception as e:
+        logger.error(f"Note search failed: {e}", exc_info=True)
+        return f"Note search error: {e}"
 
 
 @tool
