@@ -819,11 +819,13 @@ async function readPaper(paperId, title) {
         };
         
         // Set up reader UI
-        document.getElementById('readerBookTitle').textContent = title;
-        document.getElementById('readerBookMeta').textContent = `${chunks.length} sections`;
-        document.getElementById('readerChTitle').textContent = title;
-        document.getElementById('readerProgress').textContent = '0%';
-        document.getElementById('progressFill').style.width = '0%';
+        const chTitleEl = document.getElementById('readerChTitle');
+        const progressEl = document.getElementById('readerProgress');
+        const progressFillEl = document.getElementById('progressFill');
+        
+        if (chTitleEl) chTitleEl.textContent = title;
+        if (progressEl) progressEl.textContent = '0%';
+        if (progressFillEl) progressFillEl.style.width = '0%';
         
         // Paginate and render
         paginateText(fullText);
