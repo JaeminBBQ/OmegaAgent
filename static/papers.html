@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Papers - OmegaAgent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+
+        .upload-section.dragover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .upload-section h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .upload-section p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .papers-list {
+            margin-top: 30px;
+        }
+
+        .papers-list h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .paper-card {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .paper-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .paper-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .paper-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 12px;
+        }
+
+        .paper-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .paper-actions button {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+
+        .btn-query {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-query:hover {
+            background: #5568d3;
+        }
+
+        .btn-delete {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #ee5a52;
+        }
+
+        .btn-toggle {
+            background: #51cf66;
+            color: white;
+        }
+
+        .btn-toggle:hover {
+            background: #40c057;
+        }
+
+        .chat-section {
+            margin-top: 30px;
+            border-top: 2px solid #e8ebff;
+            padding-top: 30px;
+        }
+
+        .chat-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #chatInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e8ebff;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        #chatInput:focus {
+            border-color: #667eea;
+        }
+
+        .chat-response {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 Research Papers</h1>
+            <p>Upload and query academic papers with RAG</p>
+        </div>
+
+        <div class="content">
+            <!-- Upload Section -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📄</div>
+                <h2>Upload Research Paper</h2>
+                <p>Drag and drop a PDF file here, or click to browse</p>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                    Choose PDF
+                </button>
+                <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- Papers List -->
+            <div class="papers-list">
+                <h2>📚 Uploaded Papers</h2>
+                <div id="papersList"></div>
+            </div>
+
+            <!-- Chat Section -->
+            <div class="chat-section">
+                <h2>💬 Ask Questions</h2>
+                <div class="chat-input-container">
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        placeholder="Ask about your papers... (e.g., 'What are computable numbers?')"
+                        onkeypress="handleChatKeypress(event)"
+                    >
+                    <button class="btn" onclick="sendQuery()">Ask</button>
+                </div>
+                <div id="chatResponse"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Drag and drop handlers
+        const uploadSection = document.getElementById('uploadSection');
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                uploadFile(files[0]);
+            } else {
+                alert('Please drop a PDF file');
+            }
+        });
+
+        uploadSection.addEventListener('click', (e) => {
+            if (e.target === uploadSection || e.target.closest('.upload-section')) {
+                document.getElementById('fileInput').click();
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                uploadFile(file);
+            } else {
+                alert('Please select a PDF file');
+            }
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.innerHTML = '<div class="loading"><div class="spinner"></div><p>Uploading and processing...</p></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/research/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`✅ Paper uploaded successfully!\n\nTitle: ${data.title}\nChunks: ${data.chunks_created}`);
+                    loadPapers();
+                } else {
+                    alert(`❌ Upload failed: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`❌ Upload error: ${error.message}`);
+            } finally {
+                // Reset upload section
+                uploadSection.innerHTML = `
+                    <div class="upload-icon">📄</div>
+                    <h2>Upload Research Paper</h2>
+                    <p>Drag and drop a PDF file here, or click to browse</p>
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">
+                        Choose PDF
+                    </button>
+                `;
+            }
+        }
+
+        async function loadPapers() {
+            const papersList = document.getElementById('papersList');
+            papersList.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/research/papers`);
+                const papers = await response.json();
+
+                if (papers.length === 0) {
+                    papersList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <p>No papers uploaded yet</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                papersList.innerHTML = papers.map(paper => `
+                    <div class="paper-card">
+                        <div class="paper-title">${paper.title}</div>
+                        <div class="paper-meta">
+                            ${paper.authors.length > 0 ? paper.authors.join(', ') + ' • ' : ''}
+                            ${paper.year || 'Year unknown'} • 
+                            ${paper.page_count} pages
+                        </div>
+                        <div class="paper-actions">
+                            <button class="btn-query" onclick="queryPaper('${paper.title}')">
+                                💬 Ask about this paper
+                            </button>
+                            <button class="btn-toggle" onclick="toggleVisibility('${paper.id}', ${!paper.visible_on_dashboard})">
+                                ${paper.visible_on_dashboard ? '👁️ Hide' : '👁️‍🗨️ Show'}
+                            </button>
+                            <button class="btn-delete" onclick="deletePaper('${paper.id}', '${paper.title}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                papersList.innerHTML = `<p style="color: red;">Error loading papers: ${error.message}</p>`;
+            }
+        }
+
+        function queryPaper(title) {
+            const chatInput = document.getElementById('chatInput');
+            chatInput.value = `Tell me about "${title}"`;
+            chatInput.focus();
+        }
+
+        async function deletePaper(paperId, title) {
+            if (!confirm(`Delete "${title}"?\n\nThis will remove the paper and all its chunks from the database.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/research/papers/${paperId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('✅ Paper deleted');
+                    loadPapers();
+                } else {
+                    const data = await response.json();
+                    alert(`❌ Delete failed: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function toggleVisibility(paperId, visible) {
+            try {
+                const response = await fetch(`${API_BASE}/research/papers/${paperId}/visibility`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visible })
+                });
+
+                if (response.ok) {
+                    loadPapers();
+                } else {
+                    const data = await response.json();
+                    alert(`❌ Update failed: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function sendQuery() {
+            const input = document.getElementById('chatInput');
+            const query = input.value.trim();
+            
+            if (!query) return;
+
+            const responseDiv = document.getElementById('chatResponse');
+            responseDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Thinking...</p></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/research/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: query })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    responseDiv.innerHTML = `<div class="chat-response">${data.response}</div>`;
+                } else {
+                    responseDiv.innerHTML = `<div class="chat-response" style="color: red;">Error: ${data.detail}</div>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div class="chat-response" style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendQuery();
+            }
+        }
+
+        // Load papers on page load
+        loadPapers();
+    </script>
+</body>
+</html>

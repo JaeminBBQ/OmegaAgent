@@ -7,6 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core.embeddings import EmbeddingsClient
@@ -296,3 +297,12 @@ async def reset_session():
     except Exception as e:
         logger.error(f"Reset failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Reset failed: {e}")
+
+
+@router.get("/ui")
+async def research_ui():
+    """Serve the research papers management UI."""
+    ui_path = Path(__file__).parent.parent.parent / "static" / "papers.html"
+    if not ui_path.exists():
+        raise HTTPException(status_code=404, detail="UI not found")
+    return FileResponse(ui_path)
