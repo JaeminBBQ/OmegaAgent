@@ -36,7 +36,8 @@ kokoro_model = None
 async def load_model():
     global kokoro_model
     logger.info("Loading Kokoro TTS model...")
-    kokoro_model = Kokoro("kokoro-v0_19.onnx", "voices.bin")
+    # Initialize without file paths - library will download models automatically
+    kokoro_model = Kokoro()
     logger.info("Kokoro model loaded successfully")
 
 
