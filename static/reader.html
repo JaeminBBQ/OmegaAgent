@@ -449,8 +449,14 @@ function renderPage() {
     const text = pages[pageIndex] || '';
     // Render as plain text — will be chunked for TTS highlighting later
     document.getElementById('pageText').textContent = text;
+    
+    // Calculate progress
+    const percent = currentSection.chapter_percent !== undefined 
+        ? currentSection.chapter_percent 
+        : Math.round((pageIndex / pages.length) * 100);
+    
     document.getElementById('readerProgress').textContent =
-        `pg ${pageIndex + 1}/${pages.length} · ${currentSection.chapter_percent}%`;
+        `pg ${pageIndex + 1}/${pages.length} · ${percent}%`;
 }
 
 function prevPage() {
@@ -800,15 +806,30 @@ async function readPaper(paperId, title) {
             chunks: chunks
         };
         
+        // Combine all chunks into one text for reading
+        const fullText = chunks.map(c => c.content).join('\n\n');
+        
         currentSection = {
-            content: chunks.map(c => c.content).join('\n\n'),
-            chapter_index: 0
+            text: fullText,
+            content: fullText,
+            chapter_title: title,
+            chapter_index: 0,
+            chapter_percent: 0,
+            done: false
         };
         
-        // Show reader
+        // Set up reader UI
         document.getElementById('readerBookTitle').textContent = title;
         document.getElementById('readerBookMeta').textContent = `${chunks.length} sections`;
-        renderReaderContent();
+        document.getElementById('readerChTitle').textContent = title;
+        document.getElementById('readerProgress').textContent = '0%';
+        document.getElementById('progressFill').style.width = '0%';
+        
+        // Paginate and render
+        paginateText(fullText);
+        pageIndex = 0;
+        renderPage();
+        
         showScreen('reader');
     } catch (e) {
         toast('Failed to load paper: ' + e.message);
