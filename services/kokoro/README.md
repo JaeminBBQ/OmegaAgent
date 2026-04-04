@@ -17,7 +17,10 @@ python -m venv venv-kokoro
 .\venv-kokoro\Scripts\activate
 
 # Install dependencies
-pip install fastapi uvicorn[standard] kokoro-onnx numpy scipy
+pip install fastapi "uvicorn[standard]" numpy scipy onnxruntime
+
+# Install Kokoro (use the GitHub version for latest)
+pip install git+https://github.com/thewh1teagle/kokoro-onnx.git
 ```
 
 ### 3. Run Kokoro Server
@@ -58,7 +61,10 @@ python3.11 -m venv venv-kokoro
 source venv-kokoro/bin/activate
 
 # Install dependencies
-pip install fastapi uvicorn[standard] kokoro-onnx numpy scipy
+pip install fastapi "uvicorn[standard]" numpy scipy onnxruntime
+
+# Install Kokoro (use the GitHub version for latest)
+pip install git+https://github.com/thewh1teagle/kokoro-onnx.git
 ```
 
 ### 3. Run Kokoro Server

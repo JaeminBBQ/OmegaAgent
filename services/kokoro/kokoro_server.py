@@ -11,14 +11,33 @@ import logging
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
-from kokoro import generate
 from pydantic import BaseModel, Field
 from scipy.io import wavfile
+
+try:
+    from kokoro_onnx import Kokoro
+except ImportError:
+    # Fallback for different package structure
+    try:
+        from kokoro import Kokoro
+    except ImportError:
+        raise ImportError("kokoro-onnx package not installed. Run: pip install kokoro-onnx")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Kokoro TTS", version="1.0.0")
+
+# Initialize Kokoro model
+kokoro_model = None
+
+
+@app.on_event("startup")
+async def load_model():
+    global kokoro_model
+    logger.info("Loading Kokoro TTS model...")
+    kokoro_model = Kokoro("kokoro-v0_19.onnx", "voices.bin")
+    logger.info("Kokoro model loaded successfully")
 
 
 class TTSRequest(BaseModel):
@@ -42,6 +61,9 @@ async def text_to_speech(request: TTSRequest):
     
     Returns WAV audio (24kHz mono).
     """
+    if not kokoro_model:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
     if request.voice not in AVAILABLE_VOICES:
         raise HTTPException(
             status_code=400,
@@ -51,8 +73,8 @@ async def text_to_speech(request: TTSRequest):
     try:
         logger.info(f"Generating TTS: {len(request.text)} chars, voice={request.voice}")
         
-        # Kokoro generate returns (sample_rate, audio_array)
-        samples, sample_rate = generate(
+        # Generate audio using Kokoro
+        samples, sample_rate = kokoro_model.create(
             request.text,
             voice=request.voice,
             speed=request.speed,
@@ -60,7 +82,7 @@ async def text_to_speech(request: TTSRequest):
         
         # Convert to WAV bytes
         wav_buffer = io.BytesIO()
-        wavfile.write(wav_buffer, sample_rate, samples)
+        wavfile.write(wav_buffer, sample_rate, samples.astype(np.int16))
         wav_bytes = wav_buffer.getvalue()
         
         logger.info(f"Generated {len(wav_bytes)} bytes of audio")
