@@ -122,6 +122,17 @@ class ResearchDB:
         result = self.client.table("paper_chunks").insert(data).execute()
         return result.data[0]
 
+    async def get_paper_chunks(self, paper_id: UUID) -> List[Dict[str, Any]]:
+        """Get all chunks for a paper, ordered by chunk_index."""
+        result = (
+            self.client.table("paper_chunks")
+            .select("*")
+            .eq("paper_id", str(paper_id))
+            .order("chunk_index")
+            .execute()
+        )
+        return result.data
+
     async def search_paper_chunks(
         self,
         query_embedding: List[float],
