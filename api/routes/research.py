@@ -89,7 +89,12 @@ async def upload_paper(file: UploadFile = File(...)):
         
         # Extract metadata
         metadata = pdf_parser.extract_metadata(temp_path)
-        logger.info(f"Extracted metadata: {metadata['title']}")
+        
+        # Override title with original filename (more reliable than PDF metadata)
+        original_title = file.filename.replace('.pdf', '').replace('_', ' ').replace('-', ' ')
+        metadata["title"] = original_title
+        
+        logger.info(f"Using title from filename: {metadata['title']}")
         
         # Compute content hash for duplicate detection
         content_hash = pdf_parser.compute_content_hash(temp_path)
@@ -306,3 +311,14 @@ async def research_ui():
     if not ui_path.exists():
         raise HTTPException(status_code=404, detail="UI not found")
     return FileResponse(ui_path)
+
+
+@router.get("/papers/{paper_id}/chunks")
+async def get_paper_chunks(paper_id: UUID):
+    """Get all chunks for a paper (for TTS reading)."""
+    try:
+        chunks = await research_db.get_paper_chunks(paper_id)
+        return chunks
+    except Exception as e:
+        logger.error(f"Failed to get chunks for paper {paper_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get chunks: {e}")

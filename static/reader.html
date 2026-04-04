@@ -176,12 +176,13 @@
 <!-- ==================== LIBRARY SCREEN ==================== -->
 <div class="screen active" id="screenLibrary">
     <div class="top-bar">
-        <h1>OmegaReader</h1>
+        <h1 id="libraryTitle">OmegaReader</h1>
         <div class="spacer"></div>
-        <button onclick="window.location.href='/research/ui'">📄 Papers</button>
+        <button id="modeToggle" onclick="toggleMode()">📄 Papers</button>
+        <button onclick="window.location.href='/research/ui'" style="margin-left: 8px;">⚙️ Manage</button>
     </div>
     <div class="book-grid" id="bookGrid">
-        <div class="empty-state">Loading books...</div>
+        <div class="empty-state">Loading...</div>
     </div>
 </div>
 
@@ -724,6 +725,96 @@ async function uploadBook(file) {
     }
     hideLoading();
     document.getElementById('epubUpload').value = '';
+}
+
+// ---------------------------------------------------------------------------
+// Mode toggle (Books vs Papers)
+// ---------------------------------------------------------------------------
+let currentMode = 'books'; // 'books' or 'papers'
+
+function toggleMode() {
+    currentMode = currentMode === 'books' ? 'papers' : 'books';
+    const toggleBtn = document.getElementById('modeToggle');
+    const titleEl = document.getElementById('libraryTitle');
+    
+    if (currentMode === 'papers') {
+        toggleBtn.textContent = '📚 Books';
+        titleEl.textContent = 'Research Papers';
+        loadPapers();
+    } else {
+        toggleBtn.textContent = '📄 Papers';
+        titleEl.textContent = 'OmegaReader';
+        loadBooks();
+    }
+}
+
+async function loadPapers() {
+    const grid = document.getElementById('bookGrid');
+    grid.innerHTML = '<div class="empty-state">Loading papers...</div>';
+    
+    try {
+        const resp = await fetch(`${OMEGA}/research/papers`);
+        const papers = await resp.json();
+        
+        // Filter to only visible papers
+        const visiblePapers = papers.filter(p => p.visible_on_dashboard);
+        
+        if (visiblePapers.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No papers available<br><small>Upload papers via the Manage page</small></div>';
+            return;
+        }
+        
+        grid.innerHTML = visiblePapers.map(paper => `
+            <div class="book-card" onclick="readPaper('${paper.id}', '${escapeHtml(paper.title)}')">
+                <h3>📄 ${escapeHtml(paper.title)}</h3>
+                <div class="meta">
+                    ${paper.authors.length > 0 ? escapeHtml(paper.authors.join(', ')) + ' · ' : ''}
+                    ${paper.year || 'Year unknown'} · ${paper.page_count} pages
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        grid.innerHTML = '<div class="empty-state">Failed to load papers</div>';
+    }
+}
+
+async function readPaper(paperId, title) {
+    showLoading('Loading paper...');
+    
+    try {
+        // Get paper chunks for reading
+        const resp = await fetch(`${OMEGA}/research/papers/${paperId}/chunks`);
+        const chunks = await resp.json();
+        
+        if (chunks.length === 0) {
+            toast('No content available');
+            hideLoading();
+            return;
+        }
+        
+        // Set up paper reading mode
+        currentBook = {
+            book_id: paperId,
+            title: title,
+            type: 'paper',
+            chunks: chunks
+        };
+        
+        currentSection = {
+            content: chunks.map(c => c.content).join('\n\n'),
+            chapter_index: 0
+        };
+        
+        // Show reader
+        document.getElementById('readerBookTitle').textContent = title;
+        document.getElementById('readerBookMeta').textContent = `${chunks.length} sections`;
+        renderReaderContent();
+        showScreen('reader');
+    } catch (e) {
+        toast('Failed to load paper: ' + e.message);
+    }
+    
+    hideLoading();
 }
 
 // ---------------------------------------------------------------------------
