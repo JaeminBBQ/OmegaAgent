@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Kokoro TTS service - fast lightweight TTS on GPU.
+"""Kokoro TTS service - fast lightweight TTS.
 
-Runs on port 8081 alongside embeddings service.
+Runs natively on Windows/Ubuntu (port 8081).
 Model: Kokoro-82M (ONNX optimized)
 """
 
 import io
 import logging
-from typing import Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -50,7 +49,6 @@ async def text_to_speech(request: TTSRequest):
         )
     
     try:
-        # Generate audio using Kokoro
         logger.info(f"Generating TTS: {len(request.text)} chars, voice={request.voice}")
         
         # Kokoro generate returns (sample_rate, audio_array)
