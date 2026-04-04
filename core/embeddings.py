@@ -30,14 +30,6 @@ class EmbeddingsClient:
         """
         result = await self.embed_batch([text])
         return result[0]
-    
-    async def embed_text(self, text: str) -> List[float]:
-        """Alias for embed() for consistency."""
-        return await self.embed(text)
-    
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """Alias for embed_batch() for consistency."""
-        return await self.embed_batch(texts)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts.

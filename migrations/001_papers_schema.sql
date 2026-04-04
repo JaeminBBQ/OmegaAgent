@@ -125,7 +125,7 @@ RETURNS TABLE (
     id UUID,
     title TEXT,
     authors TEXT[],
-    similarity DOUBLE PRECISION
+    similarity FLOAT
 )
 LANGUAGE plpgsql
 AS $$
@@ -135,7 +135,7 @@ BEGIN
         p.id,
         p.title,
         p.authors,
-        CAST(similarity(p.title, paper_title) AS DOUBLE PRECISION) AS sim
+        similarity(p.title, paper_title) AS sim
     FROM papers p
     WHERE similarity(p.title, paper_title) > similarity_threshold
     ORDER BY sim DESC;

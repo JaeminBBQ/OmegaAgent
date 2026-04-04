@@ -136,20 +136,40 @@ async def upload_paper(file: UploadFile = File(...)):
         chunks = pdf_parser.extract_text_chunks(final_path)
         logger.info(f"Extracted {len(chunks)} chunks")
         
-        # Generate embeddings and store chunks
-        chunk_texts = [chunk["content"] for chunk in chunks]
-        embeddings = await embeddings_client.embed_texts(chunk_texts)
+        # Generate embeddings in batches to avoid overwhelming the service
+        batch_size = 10
+        total_chunks = len(chunks)
         
-        for chunk, embedding in zip(chunks, embeddings):
-            await research_db.create_paper_chunk(
-                paper_id=paper_id,
-                chunk_index=chunk["chunk_index"],
-                content=chunk["content"],
-                embedding=embedding,
-                page_number=chunk["page_number"],
-            )
+        for i in range(0, total_chunks, batch_size):
+            batch_chunks = chunks[i:i+batch_size]
+            batch_texts = [chunk["content"] for chunk in batch_chunks]
+            
+            logger.info(f"Processing batch {i//batch_size + 1}/{(total_chunks + batch_size - 1)//batch_size}")
+            
+            try:
+                embeddings = await embeddings_client.embed_texts(batch_texts)
+            except Exception as e:
+                logger.error(f"Failed to generate embeddings for batch {i//batch_size + 1}: {e}")
+                # Clean up - delete the paper record
+                await research_db.delete_paper(paper_id)
+                if final_path.exists():
+                    final_path.unlink()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Embedding generation failed at chunk {i}: {e}"
+                )
+            
+            # Store chunks with embeddings
+            for chunk, embedding in zip(batch_chunks, embeddings):
+                await research_db.create_paper_chunk(
+                    paper_id=paper_id,
+                    chunk_index=chunk["chunk_index"],
+                    content=chunk["content"],
+                    embedding=embedding,
+                    page_number=chunk["page_number"],
+                )
         
-        logger.info(f"Paper processed successfully: {paper_id}")
+        logger.info(f"Paper processed successfully: {paper_id} ({total_chunks} chunks)")
         
         return PaperUploadResponse(
             paper_id=paper_id_str,
