@@ -203,16 +203,16 @@ class OmegaClient:
     # -- Research -----------------------------------------------------------
 
     async def research_chat(self, message: str, thread_id: str | None = None) -> str:
-        """Ask the research agent to search the web and summarize."""
+        """Query research papers using RAG and Sonnet analysis."""
         host = await self._get_host()
         payload: dict = {"message": message}
         if thread_id:
-            payload["thread_id"] = thread_id
+            payload["session_id"] = thread_id
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.post(f"{host}/websearch/chat", json=payload)
+            r = await client.post(f"{host}/research/chat", json=payload)
             r.raise_for_status()
-            return r.json()["reply"]
+            return r.json()["response"]
 
     # -- Full pipelines -----------------------------------------------------
 

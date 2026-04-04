@@ -48,6 +48,9 @@ HELP_TEXT = """
 ║  WebSearch:                               ║
 ║    /websearch <q> — web search + summarize║
 ║                                           ║
+║  Research:                                ║
+║    /research <q>  — query research papers ║
+║                                           ║
 ║  Other:                                   ║
 ║    /weather       — get Reno weather      ║
 ║    /status        — check server health   ║
@@ -187,6 +190,21 @@ async def handle_status() -> None:
         await send_to_discord(msg, username="📊 Status")
     except Exception as e:
         print(f"❌ Status check failed: {e}")
+
+
+async def handle_research_papers(query: str) -> None:
+    """Query research papers using RAG."""
+    print("\n⏳ Searching papers...")
+    try:
+        reply = await client.research_chat(query)
+        print(f"\n🔬 {reply}")
+        await send_to_discord(f"🔬 **Research:** {query}\n\n{reply}", username="🔬 Research")
+
+        if tts_enabled:
+            audio = await client.speak(reply)
+            play_audio(audio)
+    except Exception as e:
+        print(f"❌ Research failed: {e}")
 
 
 async def handle_note(message: str) -> None:
@@ -345,6 +363,9 @@ async def main() -> None:
         elif user_input.startswith("/websearch "):
             query = user_input[11:].strip()
             await handle_research(query)
+        elif user_input.startswith("/research "):
+            query = user_input[10:].strip()
+            await handle_research_papers(query)
         elif user_input.startswith("/note "):
             msg = user_input[6:].strip()
             await handle_note(msg)
