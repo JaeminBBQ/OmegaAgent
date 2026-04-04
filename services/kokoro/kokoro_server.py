@@ -35,9 +35,42 @@ kokoro_model = None
 @app.on_event("startup")
 async def load_model():
     global kokoro_model
+    from pathlib import Path
+    import os
+    
     logger.info("Loading Kokoro TTS model...")
-    # Initialize without file paths - library will download models automatically
-    kokoro_model = Kokoro()
+    
+    # Use user's cache directory for models
+    cache_dir = Path.home() / ".cache" / "kokoro"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    model_path = cache_dir / "kokoro-v0_19.onnx"
+    voices_path = cache_dir / "voices.bin"
+    
+    # Download models if they don't exist
+    if not model_path.exists() or not voices_path.exists():
+        logger.info("Downloading Kokoro models to %s...", cache_dir)
+        import urllib.request
+        
+        base_url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/"
+        
+        if not model_path.exists():
+            logger.info("Downloading kokoro-v0_19.onnx...")
+            urllib.request.urlretrieve(
+                base_url + "kokoro-v0_19.onnx",
+                model_path
+            )
+        
+        if not voices_path.exists():
+            logger.info("Downloading voices.bin...")
+            urllib.request.urlretrieve(
+                base_url + "voices.bin",
+                voices_path
+            )
+        
+        logger.info("Models downloaded successfully")
+    
+    kokoro_model = Kokoro(str(model_path), str(voices_path))
     logger.info("Kokoro model loaded successfully")
 
 
