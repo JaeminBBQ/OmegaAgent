@@ -34,12 +34,10 @@ class PDFParser:
         metadata = doc.metadata or {}
         
         # Extract basic metadata
-        title = metadata.get("title", "")
         authors = metadata.get("author", "")
         
-        # If no title in metadata, try to extract from first page
-        if not title:
-            title = self._extract_title_from_first_page(doc)
+        # Use filename as title (most reliable)
+        title = pdf_path.stem.replace('_', ' ').replace('-', ' ')
         
         # Parse authors into list
         author_list = self._parse_authors(authors)
@@ -55,7 +53,7 @@ class PDFParser:
         doc.close()
         
         return {
-            "title": title or pdf_path.stem,  # Fallback to filename
+            "title": title,
             "authors": author_list,
             "year": year,
             "doi": doi,
