@@ -822,21 +822,25 @@ async function readPaper(paperId, title) {
             done: false
         };
         
-        // Set up reader UI
-        const chTitleEl = document.getElementById('readerChTitle');
-        const progressEl = document.getElementById('readerProgress');
-        const progressFillEl = document.getElementById('progressFill');
-        
-        if (chTitleEl) chTitleEl.textContent = title;
-        if (progressEl) progressEl.textContent = '0%';
-        if (progressFillEl) progressFillEl.style.width = '0%';
-        
-        // Paginate and render
-        paginateText(fullText);
-        pageIndex = 0;
-        renderPage();
-        
+        // Show screen first so DOM elements exist
         showScreen('reader');
+        
+        // Wait a tick for DOM to be ready
+        setTimeout(() => {
+            // Set up reader UI
+            const chTitleEl = document.getElementById('readerChTitle');
+            const progressEl = document.getElementById('readerProgress');
+            const progressFillEl = document.getElementById('progressFill');
+            
+            if (chTitleEl) chTitleEl.textContent = title;
+            if (progressEl) progressEl.textContent = '0%';
+            if (progressFillEl) progressFillEl.style.width = '0%';
+            
+            // Paginate and render
+            paginateText(fullText);
+            pageIndex = 0;
+            renderPage();
+        }, 10);
     } catch (e) {
         toast('Failed to load paper: ' + e.message);
     }
