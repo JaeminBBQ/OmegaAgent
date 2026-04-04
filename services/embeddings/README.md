@@ -1,14 +1,24 @@
-# Self-Hosted Embedding Service
+# AI Services (GPU Server)
 
-Sentence-transformers embedding service for OmegaAgent RAG pipeline.
+Combined Kokoro TTS + Embeddings service running on GPU for optimal performance.
 
-## Model
+## Services
 
-**bge-large-en-v1.5** (BAAI)
+### 1. Kokoro TTS (Port 8081)
+**Model**: Kokoro-82M (ONNX optimized)
+- Fast lightweight TTS
+- 11 voices (English)
+- ~200ms latency
+- ~500MB VRAM
+
+### 2. Embeddings (Port 8082)
+**Model**: bge-large-en-v1.5 (BAAI)
 - 1024 dimensions
 - Optimized for retrieval tasks
 - SOTA performance on academic papers
 - ~1.3GB VRAM
+
+**Total VRAM**: ~1.8GB (plenty of room on 3060 Ti)
 
 ## Deployment (GPU Server)
 
@@ -18,17 +28,38 @@ cd ~/Projects/OmegaAgent/services/embeddings
 docker compose up -d --build
 
 # Check health
-curl http://172.16.0.94:8082/v1/health
-
-# Test embedding
-curl -X POST http://172.16.0.94:8082/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{"texts": ["Hello world", "Test embedding"]}'
+curl http://172.16.0.94:8081/v1/health  # Kokoro
+curl http://172.16.0.94:8082/v1/health  # Embeddings
 ```
 
-## API
+## API Reference
 
-### POST /v1/embeddings
+### Kokoro TTS
+
+**POST /v1/tts**
+
+Generate speech from text.
+
+**Request:**
+```json
+{
+  "text": "Hello from Kokoro",
+  "voice": "af_bella",
+  "speed": 1.0
+}
+```
+
+**Response**: WAV audio (24kHz mono)
+
+**Available voices**: `af_heart`, `af_bella`, `af_nicole`, `af_sarah`, `af_sky`, `am_adam`, `am_michael`, `bf_emma`, `bf_isabella`, `bm_george`, `bm_lewis`
+
+**GET /v1/voices** - List available voices
+
+---
+
+### Embeddings
+
+**POST /v1/embeddings**
 
 Generate embeddings for texts.
 
@@ -49,26 +80,17 @@ Generate embeddings for texts.
 }
 ```
 
-### GET /v1/health
-
-Health check.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "model": "BAAI/bge-large-en-v1.5",
-  "device": "cuda",
-  "dimensions": 1024
-}
-```
-
 ## Performance
 
-- **Throughput**: ~1000 chunks/sec on 3060 Ti
-- **Latency**: ~10ms per text (single), ~100ms for batch of 100
-- **VRAM**: ~1.3GB
+**Kokoro TTS:**
+- Latency: ~200ms per sentence
+- Throughput: ~5 requests/sec
+
+**Embeddings:**
+- Throughput: ~1000 chunks/sec
+- Latency: ~10ms per text (single), ~100ms for batch of 100
 
 ## Integration
 
-OmegaAgent uses `core/embeddings.py` client to communicate with this service.
+- `core/speech.py` - Kokoro TTS client
+- `core/embeddings.py` - Embeddings client
