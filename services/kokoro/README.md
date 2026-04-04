@@ -7,7 +7,18 @@ Kokoro TTS runs natively on Windows/Ubuntu for best performance. Use the existin
 ### 1. Install Python 3.11+
 Download from [python.org](https://www.python.org/downloads/)
 
-### 2. Install Dependencies
+### 2. Install Visual C++ Redistributable
+Required for ONNX Runtime to work properly.
+
+```powershell
+# Download and install
+Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "vc_redist.x64.exe"
+.\vc_redist.x64.exe /install /quiet /norestart
+```
+
+Or download manually: https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+### 3. Install Dependencies
 ```powershell
 # Open PowerShell as Administrator
 cd C:\path\to\OmegaAgent
@@ -23,7 +34,7 @@ pip install fastapi "uvicorn[standard]" numpy scipy onnxruntime
 pip install git+https://github.com/thewh1teagle/kokoro-onnx.git
 ```
 
-### 3. Run Kokoro Server
+### 4. Run Kokoro Server
 ```powershell
 # Activate venv
 .\venv-kokoro\Scripts\activate
@@ -32,7 +43,7 @@ pip install git+https://github.com/thewh1teagle/kokoro-onnx.git
 python services\kokoro\kokoro_server.py
 ```
 
-### 4. Auto-start on Boot (Optional)
+### 5. Auto-start on Boot (Optional)
 Create a scheduled task:
 1. Open Task Scheduler
 2. Create Basic Task → "Kokoro TTS"
