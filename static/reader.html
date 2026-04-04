@@ -204,7 +204,7 @@
 <!-- ==================== READER SCREEN ==================== -->
 <div class="screen" id="screenReader">
     <div class="top-bar">
-        <button onclick="showScreen('chapters')">← Ch</button>
+        <button onclick="goBackFromReader()">← Back</button>
         <div>
             <span id="readerChTitle" style="color:#58a6ff;font-weight:bold"></span>
         </div>
@@ -389,6 +389,11 @@ async function jumpToChapter(index) {
 }
 
 async function continueReading() {
+    if (currentBook && currentBook.type === 'paper') {
+        const idx = currentBook.progress?.chapter_index || 0;
+        readPaperSection(idx);
+        return;
+    }
     showLoading('Loading...');
     try {
         await loadReaderSection();
@@ -485,6 +490,15 @@ function nextPage() {
 async function advanceAndLoadNext() {
     if (!currentSection || currentSection.done) return;
     stopPlay();
+    
+    // For papers, advance to next section
+    if (currentBook && currentBook.type === 'paper') {
+        const idx = (currentBook.progress?.chapter_index || 0) + 1;
+        if (idx < paperSections.length) readPaperSection(idx);
+        else toast('End of paper');
+        return;
+    }
+    
     showLoading('Loading next section...');
     try {
         await fetch(`${OMEGA}/reading/books/${currentBook.book_id}/advance?chars_read=${currentSection.chars_in_section}`, { method: 'POST' });
@@ -495,12 +509,32 @@ async function advanceAndLoadNext() {
     hideLoading();
 }
 
+function goBackFromReader() {
+    stopPlay();
+    if (currentBook && currentBook.type === 'paper') {
+        showScreen('chapters');
+    } else {
+        showScreen('chapters');
+    }
+}
+
 async function prevChapter() {
+    if (currentBook && currentBook.type === 'paper') {
+        const idx = (currentBook.progress?.chapter_index || 0) - 1;
+        if (idx >= 0) readPaperSection(idx);
+        return;
+    }
     const ch = (currentBook.progress?.chapter_index || 0) - 1;
     if (ch >= 0) await jumpToChapter(ch);
 }
 
 async function nextChapter() {
+    if (currentBook && currentBook.type === 'paper') {
+        const idx = (currentBook.progress?.chapter_index || 0) + 1;
+        if (idx < paperSections.length) readPaperSection(idx);
+        else toast('End of paper');
+        return;
+    }
     const ch = (currentBook.progress?.chapter_index || 0) + 1;
     if (ch < currentBook.chapter_count) await jumpToChapter(ch);
     else toast('Already at last chapter');
@@ -788,6 +822,8 @@ async function loadPapers() {
     }
 }
 
+let paperSections = []; // grouped paper chunks by page
+
 async function readPaper(paperId, title) {
     showLoading('Loading paper...');
     
@@ -802,50 +838,83 @@ async function readPaper(paperId, title) {
             return;
         }
         
-        // Set up paper reading mode
+        // Group chunks by page number into sections
+        const pageMap = {};
+        chunks.forEach(c => {
+            const pg = c.page_number || 0;
+            if (!pageMap[pg]) pageMap[pg] = [];
+            pageMap[pg].push(c);
+        });
+        
+        // Create sections from page groups
+        paperSections = Object.keys(pageMap).sort((a, b) => a - b).map(pg => ({
+            page: parseInt(pg),
+            content: pageMap[pg].map(c => c.content).join('\n\n'),
+            preview: pageMap[pg][0].content.substring(0, 80) + '...'
+        }));
+        
+        // Set up paper mode
         currentBook = {
             book_id: paperId,
             title: title,
             type: 'paper',
-            chunks: chunks
+            chapter_count: paperSections.length,
+            progress: { chapter_index: 0 }
         };
+        currentChapters = paperSections.map((s, i) => ({
+            title: `Page ${s.page + 1}`
+        }));
         
-        // Combine all chunks into one text for reading
-        const fullText = chunks.map(c => c.content).join('\n\n');
+        // Render the sections list using the chapters screen
+        document.getElementById('chapBookTitle').textContent = title;
+        document.getElementById('chapBookMeta').textContent = `${paperSections.length} pages · ${chunks.length} chunks`;
+        document.getElementById('continueBtn').textContent = '▶ Start Reading';
         
-        currentSection = {
-            text: fullText,
-            content: fullText,
-            chapter_title: title,
-            chapter_index: 0,
-            chapter_percent: 0,
-            done: false
-        };
+        const list = document.getElementById('chapterList');
+        list.innerHTML = paperSections.map((s, i) => `
+            <div class="chapter-item" onclick="readPaperSection(${i})">
+                <span class="ch-num">${s.page + 1}</span>
+                <span class="ch-title">${escapeHtml(s.preview)}</span>
+            </div>
+        `).join('');
         
-        // Show screen first so DOM elements exist
-        showScreen('reader');
-        
-        // Wait a tick for DOM to be ready
-        setTimeout(() => {
-            // Set up reader UI
-            const chTitleEl = document.getElementById('readerChTitle');
-            const progressEl = document.getElementById('readerProgress');
-            const progressFillEl = document.getElementById('progressFill');
-            
-            if (chTitleEl) chTitleEl.textContent = title;
-            if (progressEl) progressEl.textContent = '0%';
-            if (progressFillEl) progressFillEl.style.width = '0%';
-            
-            // Paginate and render
-            paginateText(fullText);
-            pageIndex = 0;
-            renderPage();
-        }, 10);
+        showScreen('chapters');
     } catch (e) {
         toast('Failed to load paper: ' + e.message);
     }
     
     hideLoading();
+}
+
+function readPaperSection(index) {
+    if (!paperSections[index]) return;
+    
+    const section = paperSections[index];
+    
+    currentSection = {
+        text: section.content,
+        content: section.content,
+        chapter_title: `Page ${section.page + 1}`,
+        chapter_index: index,
+        chapter_percent: Math.round((index / paperSections.length) * 100),
+        done: false
+    };
+    
+    currentBook.progress = { chapter_index: index };
+    
+    const chTitleEl = document.getElementById('readerChTitle');
+    const progressEl = document.getElementById('readerProgress');
+    const progressFillEl = document.getElementById('progressFill');
+    
+    if (chTitleEl) chTitleEl.textContent = `Page ${section.page + 1}`;
+    if (progressEl) progressEl.textContent = '0%';
+    if (progressFillEl) progressFillEl.style.width = '0%';
+    
+    paginateText(section.content);
+    pageIndex = 0;
+    renderPage();
+    
+    showScreen('reader');
 }
 
 // ---------------------------------------------------------------------------
