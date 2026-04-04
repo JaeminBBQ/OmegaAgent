@@ -6,9 +6,9 @@ Uses Haiku for fast queries + Sonnet tool for advanced analysis.
 import logging
 from typing import Optional
 
-from langchain.agents import AgentExecutor, create_react_agent
 from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
 
 from core.config import ANTHROPIC_API_KEY
 from core.llm import HAIKU
@@ -51,23 +51,11 @@ Remember:
 - Sonnet is more capable for deep analysis - delegate complex reasoning to it via analyze_with_sonnet
 - Always ground your answers in the retrieved sources"""
 
-        # Create ReAct agent
-        prompt = PromptTemplate.from_template(
-            self.system_prompt + "\n\n{agent_scratchpad}\n\nQuestion: {input}\n\nThought:"
-        )
-
+        # Create ReAct agent using LangGraph
         self.agent = create_react_agent(
-            llm=self.llm,
-            tools=ALL_TOOLS,
-            prompt=prompt,
-        )
-
-        self.executor = AgentExecutor(
-            agent=self.agent,
-            tools=ALL_TOOLS,
-            verbose=True,
-            max_iterations=5,
-            handle_parsing_errors=True,
+            self.llm,
+            ALL_TOOLS,
+            state_modifier=self.system_prompt,
         )
 
         logger.info("ResearchAgent initialized with %d tools", len(ALL_TOOLS))
@@ -82,13 +70,19 @@ Remember:
             Agent's response with citations
         """
         try:
-            result = await self.executor.ainvoke({"input": message})
-            return result["output"]
+            result = await self.agent.ainvoke(
+                {"messages": [HumanMessage(content=message)]}
+            )
+            # Extract the final message
+            messages = result.get("messages", [])
+            if messages:
+                return messages[-1].content
+            return "No response generated"
         except Exception as e:
             logger.error(f"Research agent error: {e}", exc_info=True)
             return f"I encountered an error processing your request: {e}"
 
     def reset(self):
         """Reset conversation memory."""
-        # ReAct agent is stateless, but we can reinitialize if needed
+        # ReAct agent is stateless
         logger.info("Research agent reset (stateless)")
