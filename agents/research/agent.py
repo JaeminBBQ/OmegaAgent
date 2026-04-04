@@ -52,10 +52,10 @@ Remember:
 - Always ground your answers in the retrieved sources"""
 
         # Create ReAct agent using LangGraph
+        # System prompt is passed via messages in LangGraph
         self.agent = create_react_agent(
             self.llm,
             ALL_TOOLS,
-            state_modifier=self.system_prompt,
         )
 
         logger.info("ResearchAgent initialized with %d tools", len(ALL_TOOLS))
@@ -70,8 +70,14 @@ Remember:
             Agent's response with citations
         """
         try:
+            from langchain_core.messages import SystemMessage
+            
+            # Include system prompt in messages
             result = await self.agent.ainvoke(
-                {"messages": [HumanMessage(content=message)]}
+                {"messages": [
+                    SystemMessage(content=self.system_prompt),
+                    HumanMessage(content=message)
+                ]}
             )
             # Extract the final message
             messages = result.get("messages", [])
