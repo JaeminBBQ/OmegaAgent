@@ -447,16 +447,20 @@ function paginateText(text) {
 function renderPage() {
     if (pages.length === 0) return;
     const text = pages[pageIndex] || '';
+    
     // Render as plain text — will be chunked for TTS highlighting later
-    document.getElementById('pageText').textContent = text;
+    const pageTextEl = document.getElementById('pageText');
+    if (pageTextEl) pageTextEl.textContent = text;
     
     // Calculate progress
-    const percent = currentSection.chapter_percent !== undefined 
+    const percent = currentSection && currentSection.chapter_percent !== undefined 
         ? currentSection.chapter_percent 
         : Math.round((pageIndex / pages.length) * 100);
     
-    document.getElementById('readerProgress').textContent =
-        `pg ${pageIndex + 1}/${pages.length} · ${percent}%`;
+    const progressEl = document.getElementById('readerProgress');
+    if (progressEl) {
+        progressEl.textContent = `pg ${pageIndex + 1}/${pages.length} · ${percent}%`;
+    }
 }
 
 function prevPage() {
