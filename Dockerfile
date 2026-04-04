@@ -5,6 +5,10 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
+        gcc \
+        g++ \
+        mupdf \
+        mupdf-tools \
         libnss3 \
         libatk1.0-0 \
         libatk-bridge2.0-0 \
