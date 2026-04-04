@@ -126,7 +126,7 @@ class ResearchDB:
         """Get all chunks for a paper, ordered by chunk_index."""
         result = (
             self.client.table("paper_chunks")
-            .select("*")
+            .select("chunk_index, content, page_number")
             .eq("paper_id", str(paper_id))
             .order("chunk_index")
             .execute()
