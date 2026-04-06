@@ -9,20 +9,19 @@ Junior DevOps engineer by title, ~4-5 years experience, Masters degree. Underuti
 ---
 
 ## What This Project Is
-A self-hosted modular AI platform running on a home network. It consists of always-on backend services running on a desktop GPU machine, with RPi clients consuming the API. The platform hosts local AI models and orchestrates cloud APIs through a unified FastAPI backend. Agents are modular — each one is a new Python module that plugs into shared core infrastructure.
+A self-hosted modular AI platform running on a home network. It consists of always-on backend services running on a desktop GPU machine, with RPi 400 client consuming the API. The platform hosts local AI models and orchestrates cloud APIs through a unified FastAPI backend. Agents are modular — each one is a new Python module that plugs into shared core infrastructure.
 
 ---
 
 ## Hardware
 - **Desktop (primary server)**: Ubuntu, i7, RTX 3060 Ti 12GB VRAM, 4TB storage. Always-on. Runs all models and the FastAPI backend.
 - **PN64 (fallback server)**: Linux, i7, 64GB DDR5 RAM. Failover when desktop is unavailable.
-- **RPi 4**: Touchscreen, conference speaker and mic. Voice + visual dashboard client.
 - **RPi 400**: Keyboard only, no screen. Work assistant, Obsidian note capture, TTS output.
 
 ---
 
 ## Failover System
-RPi clients hit `/status` on desktop first (2 second timeout), fall back to PN64 if unavailable. Status endpoint returns per-service health. Active host cached 30 seconds.
+RPi 400 client hits `/status` on desktop first (2 second timeout), falls back to PN64 if unavailable. Status endpoint returns per-service health. Active host cached 30 seconds.
 
 ```python
 PRIMARY = "http://desktop:8080"
@@ -222,7 +221,6 @@ When starting from scratch, build in this order:
 - Desktop runs Ubuntu as primary OS — no WSL, native Docker + NVIDIA Container Toolkit
 - PN64 is CPU only fallback — slower inference acceptable for fallback role
 - Both desktop and PN64 expose identical API surface so failover is transparent
-- RPi 4 is voice + touch client — context aware display, not button-per-agent
 - RPi 400 is keyboard + TTS — work hours assistant tied to Obsidian vault
 - Custom voice: Fish Speech S1-mini with cloned voice ID — consistent across all TTS calls
 - Target job titles: SRE, Platform Engineer (pay better than DevOps junior)

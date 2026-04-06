@@ -1,7 +1,0 @@
-# RPi 4 (voice assistant — full audio stack)
-httpx
-python-dotenv
-sounddevice>=0.4.6
-soundfile>=0.12.1
-numpy>=1.26.0
-openwakeword>=0.6.0

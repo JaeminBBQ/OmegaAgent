@@ -1,6 +1,6 @@
 # OmegaAgent
 
-Self-hosted modular AI platform running on a home network. The PN64 runs all backend services (FastAPI, agents, scheduling, cloud APIs). The desktop handles GPU-accelerated workloads only (STT, TTS). RPi clients consume the API over LAN.
+Self-hosted modular AI platform running on a home network. The PN64 runs all backend services (FastAPI, agents, scheduling, cloud APIs). The desktop handles GPU-accelerated workloads only (STT, TTS). RPi 400 client consumes the API over LAN.
 
 ---
 
@@ -20,16 +20,17 @@ Self-hosted modular AI platform running on a home network. The PN64 runs all bac
 │  Cloud APIs: Anthropic · Supabase · Serper           │
 └───────────────────┬──────────────────────────────────┘
                     │ LAN
+                    │
       ┌─────────────┼─────────────┐
       │             │             │
- ┌────▼─────┐  ┌───▼────┐  ┌────▼──────┐
- │  RPi 4   │  │RPi 400 │  │  Desktop  │
- │ Touch +  │  │Keyboard│  │  GPU Box  │
- │ Voice    │  │ + TTS  │  │ RTX 3060Ti│
- │ Dashboard│  │ Work   │  │           │
- │          │  │ Assist │  │ Whisper   │
- └──────────┘  └────────┘  │ Fish TTS  │
-                            └───────────┘
+  ┌───▼────┐  ┌────▼──────┐
+  │RPi 400 │  │  Desktop  │
+  │Keyboard│  │  GPU Box  │
+  │ + TTS  │  │ RTX 3060Ti│
+  │ Work   │  │           │
+  │ Assist │  │ Whisper   │
+  └────────┘  │ Fish TTS  │
+              └───────────┘
 ```
 
 ### What lives where
@@ -38,12 +39,11 @@ Self-hosted modular AI platform running on a home network. The PN64 runs all bac
 |---|---|---|
 | **PN64** | Primary server | FastAPI backend, all agents, APScheduler, Playwright, cloud API calls (Anthropic, Supabase, Serper) |
 | **Desktop** | GPU services | Whisper Large v3 Turbo (STT), Fish Speech S1-mini (TTS), future local models |
-| **RPi 4** | Voice + touch client | Dashboard UI, mic input → PN64 STT proxy → Desktop Whisper, speaker output |
 | **RPi 400** | Keyboard + TTS client | Obsidian note capture, work assistant, TTS playback |
 
 ### Failover
 
-RPi clients hit `/status` on the PN64 first (2s timeout). If the PN64 is down, they can fall back to the desktop running the same FastAPI image. The active host is cached for 30 seconds.
+RPi 400 client hits `/status` on the PN64 first (2s timeout). If the PN64 is down, it can fall back to the desktop running the same FastAPI image. The active host is cached for 30 seconds.
 
 ```python
 PRIMARY = "http://172.16.0.200:8080"    # PN64
@@ -145,17 +145,7 @@ The PN64 proxies STT/TTS requests to the desktop via `WHISPER_URL`, `FISH_TTS_UR
 
 ---
 
-## RPi Clients
-
-### RPi 4 (Touchscreen + Voice Dashboard)
-
-The RPi 4 is a voice + visual dashboard client. It does NOT run any models — it calls the PN64 API for everything.
-
-**What it does:**
-- Hits `/status` to discover the active server (PN64 or desktop fallback)
-- Sends audio to STT endpoint, receives transcription
-- Sends text to agent endpoints, displays results on touchscreen
-- Plays TTS audio through conference speaker
+## RPi Client
 
 ### RPi 400 (Keyboard + TTS Work Assistant)
 

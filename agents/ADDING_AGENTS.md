@@ -241,7 +241,7 @@ async def my_agent_chat(self, message: str, thread_id: str | None = None) -> str
         return r.json()["reply"]
 ```
 
-### 8. Add command in rpi400_assistant.py
+### 8. Add command in rpi400_assistant.py (if applicable)
 
 Add to `HELP_TEXT`, add a handler function, and add the command to the main loop.
 

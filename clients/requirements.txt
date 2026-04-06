@@ -1,5 +1,4 @@
 # Use the device-specific requirements file:
 #   RPi 400:  pip install -r requirements-rpi400.txt
-#   RPi 4:    pip install -r requirements-rpi4.txt
 httpx
 python-dotenv
