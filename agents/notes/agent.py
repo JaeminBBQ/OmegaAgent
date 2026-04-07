@@ -50,18 +50,21 @@ WORKFLOW FOR NOTES:
 - When asked to find something: vault_search first, then vault_view
 - When asked to update: vault_view first to see current content, then vault_edit
 - For daily notes: append to /daily/{now.strftime('%Y-%m-%d')}.md
-- For quick thoughts: use quick_capture
+- For quick thoughts/personal notes: use quick_capture (goes to /daily/)
 
 WORKFLOW FOR TASKS:
-- Use task_add, task_list, task_complete, task_remove
+- Use task_add(description, priority, is_work) to add tasks
+- Set is_work=True for work/job-related tasks (adds #work tag)
+- Set is_work=False for personal tasks (default)
 - Encourage the user to set priorities (high/medium/low)
 - Proactively offer to organize or review tasks
 
-WORKFLOW FOR WORK:
-- Use work_log for quick work entries (auto-timestamped)
+WORKFLOW FOR WORK (ONLY for work/job-related items):
+- Use work_log ONLY for work/job-related entries (goes to /work/)
 - Use work_standup for daily standup format (yesterday/today/blockers)
 - Use meeting_notes for meeting notes with template
 - Use weekly_summary to compile the past 7 days
+- IMPORTANT: Personal/non-work notes should use quick_capture, NOT work_log
 
 WORKFLOW FOR REMINDERS:
 - Use reminder_set(message, when) for all reminders

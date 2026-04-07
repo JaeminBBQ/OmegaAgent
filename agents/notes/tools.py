@@ -185,16 +185,18 @@ def _parse_tasks(content: str) -> list[dict]:
 
 
 @tool
-def task_add(description: str, priority: str = "medium") -> str:
+def task_add(description: str, priority: str = "medium", is_work: bool = False) -> str:
     """Add a new task to the todo list.
 
     Args:
         description: What needs to be done.
         priority: Priority level — 'high', 'medium', or 'low'.
+        is_work: Whether this is a work-related task (adds #work tag).
     """
     path = _get_tasks_path()
-    tag = f"#{priority}" if priority in ("high", "medium", "low") else "#medium"
-    task_line = f"- [ ] {tag} {description}\n"
+    priority_tag = f"#{priority}" if priority in ("high", "medium", "low") else "#medium"
+    work_tag = " #work" if is_work else ""
+    task_line = f"- [ ] {priority_tag}{work_tag} {description}\n"
     with open(path, "a") as f:
         f.write(task_line)
 
@@ -207,7 +209,7 @@ def task_add(description: str, priority: str = "medium") -> str:
                 break
         path.write_text("\n".join(lines) + "\n")
 
-    return f"Added task: {tag} {description}"
+    return f"Added task: {priority_tag}{work_tag} {description}"
 
 
 @tool
