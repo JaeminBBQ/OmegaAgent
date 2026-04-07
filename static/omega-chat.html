@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>OmegaAgent</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0a0a0a; --bg2: #111;
+            --green: #00ff41; --green-dim: #00aa2a; --green-dark: #003d0f;
+            --red: #ff3333; --white: #e0e0e0; --gray: #444; --border: #1a2a1a;
+            --font: 'Menlo','Monaco','Courier New',monospace;
+        }
+        html, body { height: 100%; height: 100dvh; background: var(--bg); color: var(--green); font-family: var(--font); font-size: 14px; overflow: hidden; }
+        #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+        /* Header */
+        #header { flex-shrink: 0; padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
+        #header-left { display: flex; align-items: center; gap: 8px; }
+        #status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray); flex-shrink: 0; transition: background 0.3s; }
+        #status-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        #status-dot.down { background: var(--red); }
+        #header-title { font-size: 13px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+        #server-label { font-size: 11px; color: var(--green-dim); }
+
+        /* Messages */
+        #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 4px; -webkit-overflow-scrolling: touch; }
+        #messages::-webkit-scrollbar { width: 3px; }
+        #messages::-webkit-scrollbar-thumb { background: var(--green-dark); border-radius: 2px; }
+        .msg { margin-bottom: 14px; line-height: 1.55; word-break: break-word; }
+        .msg-meta { font-size: 10px; color: var(--green-dark); margin-bottom: 3px; letter-spacing: 0.5px; }
+        .msg-content { white-space: pre-wrap; }
+        .msg-user  .msg-content { color: var(--white); }
+        .msg-user  .msg-content::before { content: '> '; color: var(--green); }
+        .msg-system .msg-content { color: var(--green); }
+        .msg-system .msg-content::before { content: '~ '; color: var(--green-dim); }
+        .msg-error .msg-content { color: var(--red); }
+        .msg-error .msg-content::before { content: '✗ '; }
+        .msg-info .msg-content { color: var(--green-dim); }
+        .msg-info .msg-content::before { content: '· '; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        .thinking { animation: blink 1s step-end infinite; }
+
+        /* Priority row */
+        #priority-row { flex-shrink: 0; display: none; gap: 6px; padding: 0 14px 8px; background: var(--bg); }
+        #priority-row.visible { display: flex; }
+        .priority-btn { flex: 1; padding: 5px 4px; border: 1px solid var(--green-dark); border-radius: 4px; background: transparent; color: var(--green-dim); font-family: var(--font); font-size: 11px; cursor: pointer; text-align: center; -webkit-tap-highlight-color: transparent; transition: all 0.15s; }
+        .priority-btn.selected { background: var(--green-dark); color: var(--green); border-color: var(--green); }
+
+        /* Mode bar */
+        #mode-bar { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; border-top: 1px solid var(--border); background: var(--bg); }
+        #mode-bar::-webkit-scrollbar { display: none; }
+        .mode-btn { flex-shrink: 0; padding: 5px 13px; border: 1px solid var(--green-dark); border-radius: 20px; background: transparent; color: var(--green-dim); font-family: var(--font); font-size: 12px; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: all 0.15s; }
+        .mode-btn.active { background: var(--green-dark); color: var(--green); border-color: var(--green); box-shadow: 0 0 8px rgba(0,255,65,0.15); }
+
+        /* Input row */
+        #input-row { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--bg); }
+        #prompt-label { color: var(--green); font-size: 15px; flex-shrink: 0; }
+        #input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--green-dark); color: var(--white); font-family: var(--font); font-size: 16px; outline: none; padding: 4px 0; caret-color: var(--green); }
+        #input::placeholder { color: var(--gray); font-size: 13px; }
+        #send-btn { background: transparent; border: 1px solid var(--green-dark); color: var(--green); font-family: var(--font); font-size: 18px; padding: 5px 11px; border-radius: 4px; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+        #send-btn:active { background: var(--green-dark); }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div id="header">
+        <div id="header-left">
+            <div id="status-dot"></div>
+            <span id="header-title">OmegaAgent</span>
+        </div>
+        <span id="server-label">connecting...</span>
+    </div>
+
+    <div id="messages"></div>
+
+    <div id="priority-row">
+        <button class="priority-btn" data-p="low">low</button>
+        <button class="priority-btn selected" data-p="medium">medium</button>
+        <button class="priority-btn" data-p="high">! high</button>
+    </div>
+
+    <div id="mode-bar">
+        <button class="mode-btn active" data-mode="chat">💬 chat</button>
+        <button class="mode-btn" data-mode="note">📝 note</button>
+        <button class="mode-btn" data-mode="task">✅ task</button>
+        <button class="mode-btn" data-mode="worklog">💼 worklog</button>
+        <button class="mode-btn" data-mode="capture">📌 capture</button>
+        <button class="mode-btn" data-mode="weather">🌤 weather</button>
+        <button class="mode-btn" data-mode="search">🔍 search</button>
+        <button class="mode-btn" data-mode="research">🔬 research</button>
+    </div>
+
+    <div id="input-row">
+        <span id="prompt-label">❯</span>
+        <input id="input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="ask anything...">
+        <button id="send-btn">⏎</button>
+    </div>
+</div>
+<script>
+'use strict';
+// ── State
+let currentMode = 'chat', currentPriority = 'medium', isLoading = false;
+let noteThreadId = null, searchThreadId = null, researchThreadId = null;
+
+// ── DOM
+const messagesEl  = document.getElementById('messages');
+const inputEl     = document.getElementById('input');
+const statusDot   = document.getElementById('status-dot');
+const serverLabel = document.getElementById('server-label');
+const priorityRow = document.getElementById('priority-row');
+
+// ── Rendering
+function nowStr() { return new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}); }
+
+function addMsg(type, content, label) {
+    const div = document.createElement('div'); div.className = `msg msg-${type}`;
+    const meta = document.createElement('div'); meta.className = 'msg-meta';
+    meta.textContent = nowStr() + (label ? '  ' + label : '');
+    const body = document.createElement('div'); body.className = 'msg-content';
+    body.textContent = content;
+    div.appendChild(meta); div.appendChild(body);
+    messagesEl.appendChild(div); messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+}
+
+function addThinking() {
+    const div = document.createElement('div'); div.className = 'msg msg-info';
+    const meta = document.createElement('div'); meta.className = 'msg-meta'; meta.textContent = nowStr();
+    const body = document.createElement('div'); body.className = 'msg-content';
+    const span = document.createElement('span'); span.className = 'thinking'; span.textContent = '...';
+    body.appendChild(span); div.appendChild(meta); div.appendChild(body);
+    messagesEl.appendChild(div); messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+}
+
+// ── API
+async function api(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const r = await fetch(path, opts);
+    if (!r.ok) { const e = await r.json().catch(() => ({detail: r.statusText})); throw new Error(e.detail || r.statusText); }
+    return r.json();
+}
+
+// ── Server health
+async function checkServer() {
+    try { await api('GET', '/ping'); statusDot.className = 'ok'; serverLabel.textContent = 'online'; }
+    catch { statusDot.className = 'down'; serverLabel.textContent = 'offline'; }
+}
+checkServer(); setInterval(checkServer, 30000);
+
+// ── Mode switching
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); currentMode = btn.dataset.mode;
+        updatePlaceholder();
+        priorityRow.classList.toggle('visible', currentMode === 'task');
+        if (currentMode === 'weather') runWeather(); else inputEl.focus();
+    });
+});
+
+// ── Priority
+document.querySelectorAll('.priority-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected'); currentPriority = btn.dataset.p;
+    });
+});
+
+function updatePlaceholder() {
+    const map = { chat:'ask anything...', note:'add or find a note...', task:'describe the task...', worklog:'what did you work on?', capture:'quick thought or idea...', weather:'tap to refresh weather', search:'search the web...', research:'query research papers...' };
+    inputEl.placeholder = map[currentMode] || 'type a message...';
+}
+
+// ── Slash commands
+function splitRemind(raw) { const m = raw.match(/^(.*)\s+(\S+)$/); return m ? [m[1].trim(), m[2].trim()] : null; }
+
+async function handleSlashCommand(text) {
+    const si = text.indexOf(' ');
+    const cmd = (si === -1 ? text.slice(1) : text.slice(1, si)).toLowerCase();
+    const rest = si === -1 ? '' : text.slice(si + 1).trim();
+    switch (cmd) {
+        case 'weather':   await runWeather(); return true;
+        case 'tasks':     await runListTasks(); return true;
+        case 'reminders': await runListReminders(); return true;
+        case 'task':      if (!rest){addMsg('error','Usage: /task <desc>');return true;} await runQuickTask(rest); return true;
+        case 'worklog':   if (!rest){addMsg('error','Usage: /worklog <entry>');return true;} await runWorklog(rest); return true;
+        case 'capture':   if (!rest){addMsg('error','Usage: /capture <text>');return true;} await runCapture(rest); return true;
+        case 'note':      if (!rest){addMsg('error','Usage: /note <msg>');return true;} await runNote(rest); return true;
+        case 'remind': {
+            const p = splitRemind(rest);
+            if (!p){addMsg('error','Usage: /remind <msg> <time>  e.g. /remind Call dentist 3pm');return true;}
+            await runRemind(p[0], p[1]); return true;
+        }
+        case 'search': case 'websearch': if (!rest){addMsg('error','Usage: /search <query>');return true;} await runWebSearch(rest); return true;
+        case 'research':  if (!rest){addMsg('error','Usage: /research <query>');return true;} await runResearch(rest); return true;
+        case 'reset':     noteThreadId=null; searchThreadId=null; researchThreadId=null; addMsg('info','Threads reset.'); return true;
+        case 'help':      showHelp(); return true;
+        default: return false;
+    }
+}
+
+function showHelp() {
+    addMsg('system',`COMMANDS
+/weather          — Reno weather
+/tasks            — list pending tasks
+/reminders        — list reminders
+/task <desc>      — add a task
+/remind <msg> <t> — set reminder  e.g. /remind Call dentist 3pm
+/worklog <entry>  — work log entry
+/capture <text>   — quick daily note
+/note <msg>       — note agent (conversational)
+/search <query>   — web search
+/research <query> — research papers
+/reset            — reset conversation threads
+/help             — show this
+
+MODES  (pill buttons above input)
+💬 chat · 📝 note · ✅ task · 💼 worklog
+📌 capture · 🌤 weather · 🔍 search · 🔬 research`,'help');
+}
+
+// ── Agent calls
+async function runWeather() {
+    const t = addThinking();
+    try {
+        const d = await api('POST','/agents/weather/run',{latitude:39.5296,longitude:-119.8138,location_name:'Reno, NV'});
+        t.remove(); const c = d.current||{};
+        let msg = `${d.location||'Reno, NV'}: ${c.temperature_f}°F, ${c.weather_description}`;
+        if (c.wind_speed_mph) msg += `\nWind: ${c.wind_speed_mph} mph`;
+        if (c.humidity_pct)   msg += `  Humidity: ${c.humidity_pct}%`;
+        if (d.summary)        msg += `\n\n${d.summary}`;
+        if (d.alerts?.length) { msg += '\n\n⚠ Alerts:'; d.alerts.forEach(a => { msg += `\n  ${(a.severity||'').toUpperCase()}: ${a.message}`; }); }
+        addMsg('system', msg, '🌤 weather');
+    } catch(e) { t.remove(); addMsg('error',`Weather failed: ${e.message}`); }
+}
+
+async function runChat(message) {
+    const t = addThinking();
+    try { const d = await api('POST','/chat/ask',{message}); t.remove(); addMsg('system',d.reply,'🤖 haiku'); }
+    catch(e) { t.remove(); addMsg('error',`Chat failed: ${e.message}`); }
+}
+
+async function runNote(message) {
+    const t = addThinking();
+    try {
+        const body = {message}; if (noteThreadId) body.thread_id = noteThreadId;
+        const d = await api('POST','/notes/chat',body); noteThreadId = d.thread_id;
+        t.remove(); addMsg('system',d.reply,'📝 note');
+    } catch(e) { t.remove(); addMsg('error',`Note failed: ${e.message}`); }
+}
+
+async function runQuickTask(description) {
+    const t = addThinking();
+    try { const d = await api('POST','/notes/task',{description,priority:currentPriority}); t.remove(); addMsg('system',d.result,'✅ task'); }
+    catch(e) { t.remove(); addMsg('error',`Task failed: ${e.message}`); }
+}
+
+async function runWorklog(entry) {
+    const t = addThinking();
+    try { const d = await api('POST','/notes/worklog',{entry}); t.remove(); addMsg('system',d.result,'💼 worklog'); }
+    catch(e) { t.remove(); addMsg('error',`Worklog failed: ${e.message}`); }
+}
+
+async function runCapture(text) {
+    const t = addThinking();
+    try { const d = await api('POST','/notes/capture',{text}); t.remove(); addMsg('system',d.result,'📌 capture'); }
+    catch(e) { t.remove(); addMsg('error',`Capture failed: ${e.message}`); }
+}
+
+async function runListTasks() {
+    const t = addThinking();
+    try { const d = await api('GET','/notes/tasks'); t.remove(); addMsg('system',d.result,'📋 tasks'); }
+    catch(e) { t.remove(); addMsg('error',`Tasks failed: ${e.message}`); }
+}
+
+async function runListReminders() {
+    const t = addThinking();
+    try { const d = await api('GET','/notes/reminders'); t.remove(); addMsg('system',d.result,'⏰ reminders'); }
+    catch(e) { t.remove(); addMsg('error',`Reminders failed: ${e.message}`); }
+}
+
+async function runRemind(message, when) {
+    const t = addThinking();
+    try { const d = await api('POST','/notes/remind',{message,when}); t.remove(); addMsg('system',d.result,'⏰ remind'); }
+    catch(e) { t.remove(); addMsg('error',`Remind failed: ${e.message}`); }
+}
+
+async function runWebSearch(message) {
+    const t = addThinking();
+    try {
+        const body = {message}; if (searchThreadId) body.thread_id = searchThreadId;
+        const d = await api('POST','/websearch/chat',body); searchThreadId = d.thread_id;
+        t.remove(); addMsg('system',d.reply,'🔍 search');
+    } catch(e) { t.remove(); addMsg('error',`Search failed: ${e.message}`); }
+}
+
+async function runResearch(message) {
+    const t = addThinking();
+    try {
+        const body = {message}; if (researchThreadId) body.session_id = researchThreadId;
+        const d = await api('POST','/research/chat',body); researchThreadId = d.session_id || d.thread_id;
+        t.remove(); addMsg('system',d.response||d.reply,'🔬 research');
+    } catch(e) { t.remove(); addMsg('error',`Research failed: ${e.message}`); }
+}
+
+// ── Send
+async function send() {
+    const text = inputEl.value.trim();
+    if (!text || isLoading) return;
+    inputEl.value = ''; isLoading = true;
+    addMsg('user', text, `${nowStr()} · ${currentMode}`);
+    try {
+        if (text.startsWith('/')) {
+            const handled = await handleSlashCommand(text);
+            if (!handled) addMsg('error', `Unknown command: ${text} — type /help`);
+            return;
+        }
+        switch (currentMode) {
+            case 'chat':     await runChat(text); break;
+            case 'note':     await runNote(text); break;
+            case 'task':     await runQuickTask(text); break;
+            case 'worklog':  await runWorklog(text); break;
+            case 'capture':  await runCapture(text); break;
+            case 'weather':  await runWeather(); break;
+            case 'search':   await runWebSearch(text); break;
+            case 'research': await runResearch(text); break;
+            default:         await runChat(text);
+        }
+    } finally { isLoading = false; }
+}
+
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+document.getElementById('send-btn').addEventListener('click', send);
+
+// ── Boot
+addMsg('info', 'OmegaAgent terminal ready', 'system');
+addMsg('info', 'Select a mode above or type /help', 'system');
+updatePlaceholder();
+</script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 """Chat route — general-purpose Haiku conversation endpoint."""
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,15 @@ class ChatResponse(BaseModel):
 
     reply: str = Field(..., description="Assistant response")
     model: str = Field(..., description="Model used")
+
+
+@router.get("/ui")
+async def chat_ui():
+    """Serve the mobile chat web app."""
+    ui_path = Path(__file__).parent.parent.parent / "static" / "omega-chat.html"
+    if not ui_path.exists():
+        raise HTTPException(status_code=404, detail="UI not found")
+    return FileResponse(ui_path)
 
 
 @router.post("/ask", response_model=ChatResponse)
